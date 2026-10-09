@@ -1,0 +1,90 @@
+- generic [ref=f5e1]:
+  - generic [ref=f5e3]:
+    - complementary [ref=f5e4]:
+      - generic [ref=f5e5]: 商盟系统
+      - menubar [ref=f5e7]:
+        - menuitem [ref=f5e8] [cursor=pointer]
+        - menuitem [ref=f5e10] [cursor=pointer]
+        - menuitem [ref=f5e12] [cursor=pointer]
+        - menuitem [ref=f5e14] [cursor=pointer]
+        - menuitem [ref=f5e16] [cursor=pointer]
+        - menuitem [ref=f5e18] [cursor=pointer]
+        - menuitem [ref=f5e20] [cursor=pointer]
+        - menuitem [ref=f5e22] [cursor=pointer]
+        - menuitem [ref=f5e24] [cursor=pointer]
+        - menuitem [ref=f5e26] [cursor=pointer]
+        - menuitem [ref=f5e28] [cursor=pointer]
+        - menuitem [ref=f5e30] [cursor=pointer]
+        - menuitem [ref=f5e32] [cursor=pointer]
+    - generic [ref=f5e34]:
+      - banner [ref=f5e35]:
+        - generic [ref=f5e36]:
+          - generic [ref=f5e37] [cursor=pointer]
+          - navigation "面包屑" [ref=f5e38]:
+            - generic [ref=f5e39]:
+              - link "首页" [ref=f5e40]
+              - text: /
+            - link "券实例管理" [ref=f5e42]
+        - generic [ref=f5e43]:
+          - generic [ref=f5e44]: 城西社区店
+          - button [expanded] [ref=f5e47] [cursor=pointer]
+      - main [ref=f5e49]:
+        - generic [ref=f5e52]:
+          - generic [ref=f5e53]:
+            - generic [ref=f5e54]:
+              - generic [ref=f5e55]: 券模板
+              - textbox "券模板" [ref=f5e59]:
+                - /placeholder: 模板 id
+            - generic [ref=f5e61]:
+              - generic [ref=f5e62]: 用户
+              - textbox "用户" [ref=f5e66]:
+                - /placeholder: C 端用户 id
+            - generic [ref=f5e68]:
+              - generic [ref=f5e69]: 状态
+              - generic [ref=f5e72] [cursor=pointer]:
+                - generic:
+                  - combobox "状态" [ref=f5e74]
+                  - generic [ref=f5e75]: 全部
+            - generic [ref=f5e80]:
+              - generic [ref=f5e81]: 券码
+              - textbox "券码" [ref=f5e85]:
+                - /placeholder: 券码片段
+            - generic [ref=f5e87]:
+              - generic [ref=f5e88]: 有效期
+              - generic [ref=f5e90]:
+                - combobox "有效期" [ref=f5e94]
+                - generic [ref=f5e95]: "-"
+                - combobox "结束" [ref=f5e96]
+            - button "查询" [ref=f5e99] [cursor=pointer]
+          - generic [ref=f5e102]:
+            - table [ref=f5e104]:
+              - rowgroup [ref=f5e116]:
+                - row [ref=f5e117]:
+                  - columnheader "实例 id" [ref=f5e118]
+                  - columnheader "券码" [ref=f5e120]
+                  - columnheader "券模板" [ref=f5e122]
+                  - columnheader "持有用户" [ref=f5e124]
+                  - columnheader "发放方" [ref=f5e126]
+                  - columnheader "来源" [ref=f5e128]
+                  - columnheader "状态" [ref=f5e130]
+                  - columnheader "获得时间" [ref=f5e132]
+                  - columnheader "有效期至" [ref=f5e134]
+                  - columnheader "操作" [ref=f5e136]
+            - generic [ref=f5e141]:
+              - table:
+                - rowgroup
+              - paragraph [ref=f5e163]: 没有符合条件的券实例
+          - generic [ref=f5e165]:
+            - generic [ref=f5e166]: 共 0 条
+            - generic [ref=f5e169] [cursor=pointer]:
+              - generic:
+                - combobox [ref=f5e171]
+                - generic [ref=f5e172]: 10条/页
+            - button "上一页" [disabled] [ref=f5e177]
+            - list [ref=f5e178]:
+              - listitem "第 1 页" [ref=f5e179]: "1"
+            - button "下一页" [disabled] [ref=f5e180]
+  - menu "林城西" [active] [ref=f5e185]:
+    - menuitem "个人中心" [ref=f5e186] [cursor=pointer]
+    - separator [ref=f5e187]
+    - menuitem "退出登录" [ref=f5e188] [cursor=pointer]

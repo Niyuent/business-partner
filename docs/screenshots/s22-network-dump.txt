@@ -1,0 +1,24 @@
+﻿node.exe : 
+所在位置 C:\Users\59746\AppData\Roaming\npm\playwright-cli.ps1:24 字符: 5
++     & "node$exe"  "$basedir/node_modules/@playwright/cli/playwright-c ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+╔════════════════════════════════════════════════════════════════════╗
+║ Update available for @playwright/cli: 0.1.18 → 0.1.22              ║
+║ Run `npm install -g @playwright/cli@latest` (global) or            ║
+║ `npm install --save-dev @playwright/cli@latest` (local) to update. ║
+╚════════════════════════════════════════════════════════════════════╝
+
+### Result
+4. [GET] http://localhost/api/v1/auth/profile => [200] OK
+10. [GET] http://localhost/api/v1/auth/profile => [200] OK
+17. [GET] http://localhost/api/v1/coupon-instances?page=1&pageSize=10 => [200] OK
+20. [POST] http://localhost/api/v1/auth/login => [201] Created
+21. [GET] http://localhost/api/v1/auth/profile => [200] OK
+27. [GET] http://localhost/api/v1/auth/profile => [200] OK
+34. [GET] http://localhost/api/v1/coupon-instances?page=1&pageSize=10 => [200] OK
+
+Note: 27 static requests not shown, run with --static option to see them.
+

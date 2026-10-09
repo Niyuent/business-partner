@@ -1,0 +1,36 @@
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+build/
+
+# 环境变量（含各 workspace）
+.env
+**/.env
+.env.local
+.env.*.local
+server/.env
+web/.env
+# 环境变量备份 / 任意备份文件：曾误提交 .env.bak（含真实库密码），一律排除
+.env.bak
+*.bak
+!.env.example
+!**/.env.example
+
+*.log
+npm-debug.log*
+yarn-error.log*
+
+.DS_Store
+.idea/
+.vscode/
+!.vscode/extensions.json
+
+coverage/
+.temp/
+.cache/
+*.tsbuildinfo
+
+# 运行时上传目录（营业执照等），属运行时数据不入库；目录本身用 .gitkeep 保留
+uploads/*
+!uploads/.gitkeep

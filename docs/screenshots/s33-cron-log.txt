@@ -1,0 +1,21 @@
+S3.3 定时任务（积分过期清零）cron 触发日志
+=====================================================
+
+验证方式：临时把 @Cron('0 1 * * *') 改成 @Cron('* * * * *')（每分钟触发一次），
+重启 server 观察容器日志，确认 cron 真实触发并跑完整流程，随后已改回生产调度
+@Cron('0 1 * * *', { timeZone: 'Asia/Shanghai' })（北京时间每天 01:00）。
+
+`docker compose logs server --no-color`（关键片段）：
+
+[Nest] 1  - 10/07/2026, 7:13:04 PM   LOG [NestFactory] Starting Nest application...
+[Nest] 1  - 10/07/2026, 7:13:04 PM   LOG [PointsCron] 积分过期清零定时任务已注册：每天 01:00（Asia/Shanghai）执行
+[Nest] 1  - 10/07/2026, 7:13:04 PM   LOG [NestApplication] Nest application successfully started +13ms
+[Nest] 1  - 10/07/2026, 7:14:00 PM   LOG [PointsCron] 积分过期清零定时任务开始
+[Nest] 1  - 10/07/2026, 7:14:00 PM   LOG [PointsCron] 积分过期清零定时任务完成：处理 0 笔，过期 0 分
+
+说明：
+- 「已注册」来自 PointsCronService.onModuleInit（Nest 启动即打印调度信息）。
+- 「开始 / 完成」是 @Cron 整点（此处每分钟）触发后 handlePointsExpire 的输出，
+  走的是与手动触发完全相同的 PointService.expirePoints({ triggeredBy: 'cron' })。
+- 本次触发「处理 0 笔」是因为此刻库里没有 remainingAmount>0 且已过期的 EARN 批次
+  （S3.3 验收用例跑完后批次均已清零），符合幂等语义。

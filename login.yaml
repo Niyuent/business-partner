@@ -1,0 +1,24 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - heading "商盟系统" [level=1] [ref=e5]
+    - paragraph [ref=e6]: 代金券 · 积分 · 核销 · 对账 一体化管理平台
+    - list [ref=e7]:
+      - listitem [ref=e8]: ✓ 主体商家统一创建与上架代金券
+      - listitem [ref=e9]: ✓ 授权附属商家发放主体商家代金券
+      - listitem [ref=e10]: ✓ 积分兑换、到店核销、采购对账全链路
+  - generic [ref=e11]:
+    - heading "账号登录" [level=2] [ref=e12]
+    - generic [ref=e13]:
+      - textbox "请输入账号" [ref=e22]: admin
+      - generic [ref=e26]:
+        - textbox "请输入密码" [ref=e32]: Test@123456
+        - generic [ref=e34] [cursor=pointer]
+      - button "登 录" [ref=e38] [cursor=pointer]
+    - separator [ref=e40]:
+      - generic [ref=e41]: 演示账号（点击填充，口令见后台发放）
+    - generic [ref=e42]:
+      - button "主体商家 · admin" [ref=e43] [cursor=pointer]
+      - button "附属已授权 · sub01" [ref=e45] [cursor=pointer]
+      - button "附属未授权 · sub02" [ref=e47] [cursor=pointer]
+      - button "店员 · clerk01" [ref=e49] [cursor=pointer]
+    - generic [ref=e51]: 统一口令 Test@123456（真实后端校验，无 Mock）

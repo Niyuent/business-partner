@@ -1,0 +1,20 @@
+﻿✅ [用例1] 生成对账单，金额 = 20+30 = 50 :: status=201 amount=50
+✅ [用例1] 快照一致性：新增核销后金额不变（仍 50） :: amount=50 count=2
+✅ [用例2] 重复生成返回已存在（200 + idempotent） :: status=200 idempotent=true
+✅ [用例2] 库里只有 1 条（不重复创建） :: count=1
+✅ [用例3] 附属只看到自己的对账单（merchantId 全为 2） :: list=[2]
+✅ [用例3] 附属查别家对账单 → 404（不泄露） :: status=404
+✅ [用例3] 主体看全部（≥2 条） :: total=2
+✅ [用例4] GENERATED → CONFIRMED 成功 :: status=200
+✅ [用例4] CONFIRMED → DISPUTED → 409 SETTLEMENT_FROZEN :: status=409 reason=SETTLEMENT_FROZEN
+✅ [用例4] GENERATED → DISPUTED 成功（必填原因） :: status=200
+✅ [用例4] DISPUTED → CONFIRMED → 409 SETTLEMENT_NOT_CONFIRMABLE :: status=409 reason=SETTLEMENT_NOT_CONFIRMABLE
+✅ [用例4] 提异议缺原因 → 400 SETTLEMENT_DISPUTE_REASON_REQUIRED :: status=400 reason=SETTLEMENT_DISPUTE_REASON_REQUIRED
+✅ [用例4] DISPUTED → 重新生成 → GENERATED :: status=GENERATED regen=true
+✅ [用例5] CSV 带 UTF-8 BOM（Excel 中文不乱码） :: firstChar=0xfeff
+✅ [用例5] CSV 字段完整（券码/用户/核销时间/门店/面值/抵扣） :: contains=true
+✅ [用例5] CSV 引号转义（字段被双引号包裹） :: quoted=true
+✅ [用例6] 10000 条核销生成对账单 < 5 秒 :: 1452ms
+✅ [用例6] 总额 = 10000（DB 聚合，非应用层循环） :: amount=10000 count=10000
+
+===== S4.2 结果：18 通过 / 0 失败 =====

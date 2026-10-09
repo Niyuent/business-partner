@@ -1,0 +1,29 @@
+================ 成功用例 ================
+S-1 生成券码  => HTTP 201 | 期望[201] | batchNo=1001-20261007-901 qty=5 codes=JP4EXXMCCFCX,CTHRDT766JX6,DDC6Q4UKE7GK,6UBPQMCDNSG8,EB2V3YA2EZK9
+S-2 券码列表  => HTTP 200 | 期望[200] | total=55 stats={"unused":55,"issued":0,"redeemed":0}
+S-3 批次列表  => HTTP 200 | 期望[200] | 1001-20261007-901(x5) 1001-20261007-001(x50)
+S-4 主体发自有券  => HTTP 201 | 期望[201] | instance=94 code=9VY4FYA3NEN2 expireAt=2026-11-05T17:44:28.488Z issuer=星链商盟（主体）
+S-5 附属发主体券  => HTTP 201 | 期望[201] | instance=95 code=QHTGXWJSX2D9 issuer=城南旗舰店
+S-6 手机号批量发券  => HTTP 201 | 期望[201] | qty=2 codes=SFF5XBTJSPN3,GXSHHGEY47ZR
+S-7a 冻结  => HTTP 200 | 期望[FROZEN] | status=FROZEN
+S-7b 解冻  => HTTP 200 | 期望[UNUSED] | status=UNUSED
+S-8 实例列表  => HTTP 200 | 期望[200] | total=3 first=QHTGXWJSX2D9/UNUSED
+S-9 实例详情  => HTTP 200 | 期望[200] | template=T1 满100减20 user=张三 applyScope=ALL_STORES
+S-10 附属实例列表  => HTTP 200 | 期望[仅 issuer=2 / 自有模板] | total=4 issuers=2
+
+================ 失败用例 ================
+F-1 sub02 未授权发券  => HTTP 403 PERMISSION_DENIED | 期望[403 SUB_MERCHANT_NOT_AUTHORIZED] | 缺少权限码：coupon:issue-main / coupon:issue
+F-2 sub01 发范围外 T3  => HTTP 403 TEMPLATE_NOT_IN_AUTHORIZED_SCOPE | 期望[403 TEMPLATE_NOT_IN_AUTHORIZED_SCOPE] | 模板「T3 满200减50（不在授权范围）」不在该商家的授权范围内
+F-3 sub01 发附属券 T4  => HTTP 403 SUB_MERCHANT_CAN_ONLY_ISSUE_MAIN_COUPON | 期望[403 SUB_MERCHANT_CAN_ONLY_ISSUE_MAIN_COUPON] | 附属商家只能发放主体商家代金券
+F-4 下架后发券  => HTTP 400 TEMPLATE_NOT_AVAILABLE | 期望[400 TEMPLATE_NOT_AVAILABLE] | 模板「T1 满100减20」当前状态为 UNPUBLISHED，不可发放
+        （已重新上架 1001）
+F-5 重复批次号  => HTTP 409 BATCH_ALREADY_EXISTS | 期望[409 BATCH_ALREADY_EXISTS] | 批次号 1001-20261007-901 已存在，不能重复生成
+F-6 券码池耗尽(需3/仅2)  => HTTP 409 CODE_POOL_EXHAUSTED | 期望[409 CODE_POOL_EXHAUSTED] | 券码池不足：本次需 3 个，可用 2 个，请先预生成券码
+F-7 库存不足(需2/仅1)  => HTTP 409 STOCK_EXHAUSTED | 期望[409 STOCK_EXHAUSTED] | 模板「F7 库存用例券」库存不足：本次需 2 张，剩余 1 张
+F-8 并发扣库存(库存1/并发2)  => OK:id=98 | ERR:409:STOCK_EXHAUSTED | 期望[恰好 1 个 OK + 1 个 409 STOCK_EXHAUSTED]
+F-9 撤授权后立即发券  => HTTP 403 SUB_MERCHANT_NOT_AUTHORIZED | 期望[403 SUB_MERCHANT_NOT_AUTHORIZED] | 该商家未获得发放主体商家代金券的授权
+        （已恢复 SUB-01 授权 [1001,1002]，result=OK）
+F-10 sub02 查券码  => HTTP 404 RESOURCE_NOT_FOUND | 期望[404 RESOURCE_NOT_FOUND] | 券模板不存在或不在你的可见范围内
+F-11 clerk01 发券  => HTTP 403 PERMISSION_DENIED | 期望[403 PERMISSION_DENIED] | 缺少权限码：coupon:issue-main / coupon:issue
+F-12 sub01 查 sub02 发放  => HTTP 403 FORBIDDEN_SCOPE | 期望[403 FORBIDDEN_SCOPE] | 只能查询自己发放的券实例
+F-13 冻结已核销券  => HTTP 409 COUPON_NOT_FREEZABLE | 期望[409 COUPON_NOT_FREEZABLE] | 只有未使用（UNUSED）的券可以冻结，当前状态为 USED

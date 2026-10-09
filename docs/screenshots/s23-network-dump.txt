@@ -1,0 +1,41 @@
+﻿node.exe : 
+所在位置 C:\Users\59746\AppData\Roaming\npm\playwright-cli.ps1:24 字符: 5
++     & "node$exe"  "$basedir/node_modules/@playwright/cli/playwright-c ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+╔════════════════════════════════════════════════════════════════════╗
+║ Update available for @playwright/cli: 0.1.18 → 0.1.22              ║
+║ Run `npm install -g @playwright/cli@latest` (global) or            ║
+║ `npm install --save-dev @playwright/cli@latest` (local) to update. ║
+╚════════════════════════════════════════════════════════════════════╝
+
+### Result
+4. [GET] http://localhost/api/v1/auth/profile => [200] OK
+11. [GET] http://localhost/api/v1/auth/profile => [200] OK
+12. [GET] http://localhost/api/v1/sub/stores => [200] OK
+16. [GET] http://localhost/api/v1/auth/profile => [200] OK
+23. [GET] http://localhost/api/v1/auth/profile => [200] OK
+24. [GET] http://localhost/api/v1/sub/stores => [200] OK
+25. [POST] http://localhost/api/v1/redemptions/verify => [201] Created
+29. [GET] http://localhost/api/v1/auth/profile => [200] OK
+36. [GET] http://localhost/api/v1/auth/profile => [200] OK
+37. [GET] http://localhost/api/v1/sub/stores => [200] OK
+38. [POST] http://localhost/api/v1/redemptions/verify => [404] Not Found
+42. [GET] http://localhost/api/v1/auth/profile => [200] OK
+49. [GET] http://localhost/api/v1/auth/profile => [200] OK
+50. [GET] http://localhost/api/v1/sub/stores => [200] OK
+51. [POST] http://localhost/api/v1/redemptions/verify => [201] Created
+52. [POST] http://localhost/api/v1/redemptions => [201] Created
+56. [GET] http://localhost/api/v1/auth/profile => [200] OK
+65. [GET] http://localhost/api/v1/redemptions?page=1&pageSize=10 => [200] OK
+66. [POST] http://localhost/api/v1/redemptions/55/reverse => [201] Created
+67. [GET] http://localhost/api/v1/redemptions?page=1&pageSize=10 => [200] OK
+70. [POST] http://localhost/api/v1/auth/login => [201] Created
+71. [GET] http://localhost/api/v1/auth/profile => [200] OK
+77. [GET] http://localhost/api/v1/auth/profile => [200] OK
+86. [GET] http://localhost/api/v1/redemptions?page=1&pageSize=10 => [200] OK
+
+Note: 62 static requests not shown, run with --static option to see them.
+

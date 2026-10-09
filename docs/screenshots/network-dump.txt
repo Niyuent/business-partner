@@ -1,0 +1,13 @@
+页面（前端 axios baseURL=/api/v1，经 Nginx 反代到 NestJS）
+========================================================================================================================
+/h5/exchange            GET     /api/v1/point-accounts/1001                                             200
+/h5/exchange            GET     /api/v1/coupon-templates?page=1&pageSize=50                             200
+/h5/exchange            GET     /api/v1/points/exchange-records?userId=1001                             200
+/h5/point-logs          GET     /api/v1/point-transactions?userId=1001&page=1                           200
+/h5/point-logs          GET     /api/v1/point-accounts/1001                                             200
+/main/orders            GET     /api/v1/orders?page=1&pageSize=10                                       200
+/main/orders            PATCH   /api/v1/orders/26/abnormal                                              409
+/main/orders/abnormal   GET     /api/v1/orders/abnormal?page=1&pageSize=10                              200
+/main/orders/abnormal   POST    /api/v1/orders/26/handle                                                201
+========================================================================================================================
+结论：所有请求 URL 均以 /api/v1/* 打头（前端 request.ts baseURL=`import.meta.env.VITE_API_BASE || /api/v1`，Nginx 将 /api 反代到 NestJS）。
