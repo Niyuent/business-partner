@@ -73,6 +73,8 @@ services:
       # 挂载 migrations：容器里跑 prisma migrate dev 生成的新迁移直接落到宿主仓库，
       # 不用再 docker compose cp 拷贝（见 docs/05 排错表）。仓库始终持有迁移，重建镜像不会丢。
       - ./server/prisma/migrations:/app/server/prisma/migrations
+      # 挂载 seed.ts：让容器内重新 seed 使用宿主最新权限定义（如 report:view/export），无需重建镜像
+      - ./server/prisma/seed.ts:/app/server/prisma/seed.ts
     depends_on:
       mysql:
         condition: service_healthy

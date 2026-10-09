@@ -375,6 +375,9 @@ async function main() {
     // 谁出钱谁结算，谁被结算谁确认。
     'settlement:confirm',
     'notification:view',
+    // S4.3.2.1：附属可查看（数据隔离到自身）并导出报表
+    'report:view',
+    'report:export',
   ];
   // sub01 额外拥有：发放主体券（已授权）+ 冻结券 + 核销冲正（S2.3：误核销 / 订单取消要能当场退回）
   const sub1Perms = [
@@ -393,6 +396,9 @@ async function main() {
     'point:earn',
     'point:exchange',
     'point:exchange:view',
+    // S4.3.2.1：门店店员可查看（隔离到本店）并导出报表
+    'report:view',
+    'report:export',
   ];
 
   const roleDefs: Array<[number, string, string, RoleScope, string[]]> = [
