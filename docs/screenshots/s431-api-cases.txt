@@ -1,0 +1,32 @@
+﻿✅ 报表 merchant-onboarding :: status=200 keys=summary,byStatus,monthly
+✅ 报表 orders-summary :: status=200 keys=summary,byStatus,byMerchant,daily
+✅ 报表 coupon-summary :: status=200 keys=summary,byStatus,byTemplate
+✅ 报表 points-summary :: status=200 keys=summary,byType
+✅ 报表 store-settlement :: status=200 keys=summary,bySettleStatus,byMerchant
+✅ 报表 authorization-logs :: status=200 keys=total,page,pageSize,byStatus,list
+✅ 报表支持 from/to 时间筛选 :: status=200
+✅ 非法 from → 400 :: status=400
+✅ 未知报表 key → 400 :: status=400
+✅ 导出 merchant-onboarding（BOM + 有内容） :: status=200 bom=true len=20
+✅ 导出 orders-summary（BOM + 有内容） :: status=200 bom=true len=51
+✅ 导出 coupon-summary（BOM + 有内容） :: status=200 bom=true len=57
+✅ 导出 points-summary（BOM + 有内容） :: status=200 bom=true len=38
+✅ 导出 store-settlement（BOM + 有内容） :: status=200 bom=true len=71
+✅ 导出 authorization-logs（BOM + 有内容） :: status=200 bom=true len=156
+✅ dashboard/stats 返回 4 张卡片 :: status=200 cards=orders:4 redemptions:0 exchanges:0 coupons:4
+✅ dashboard/stats 含 todo :: todo={"pendingMerchants":1,"abnormalOrders":1,"unreadNotifications":1}
+✅ dashboard/trend 返回 7 天三条线 :: dates=7 orders=[0,0,0,0,0,4,0]
+✅ dashboard/trend days=30 :: dates=30
+✅ dashboard/trend days 越界 → 400 :: status=400
+✅ dashboard/todo 三项齐全 :: todo={"pendingMerchants":1,"abnormalOrders":1,"unreadNotifications":1}
+✅ 店员（无 report:view）→ 403 :: status=403 reason=PERMISSION_DENIED
+✅ 店员有 dashboard:view → 200 :: status=200
+✅ 未带 token → 401 :: status=401
+✅ 附属无 report:view → 403（报表为主体视角） :: status=403 reason=PERMISSION_DENIED
+✅ 主体看全平台订单汇总 :: count=4
+✅ 已插入 10000 条压测订单 :: before=4 after=10004
+✅ 10000 条订单时 orders-summary < 3s :: 26ms count=10004
+✅ 10000 条订单时 dashboard/stats < 3s :: 32ms
+✅ 压测数据已清理 :: now=4 expect=4
+
+===== S4.3.1 验证：30 通过 / 0 失败 =====

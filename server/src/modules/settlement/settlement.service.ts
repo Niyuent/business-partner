@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MerchantType, Prisma, ReportStatus, ReportType } from '@prisma/client';
 import { BizException, ReasonCode } from '../../common/exceptions/biz.exception';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { toCsv } from '../../common/utils/csv.util';
 import { AuditService } from '../audit-log/audit.service';
 import { JwtPayload } from '../auth/jwt-payload';
 import { ConfirmSettlementDto, GenerateSettlementDto, QuerySettlementsDto } from './dto/settlement.dto';
@@ -240,13 +241,18 @@ export class SettlementService {
     }
 
     const targetStatus = dto.confirm ? ReportStatus.CONFIRMED : ReportStatus.DISPUTED;
-    // 注意：settlement_reports 表无 updatedAt/updated_at 列（schema 未定义），
-    // 此前 SQL 里写了 updatedAt 导致 ERROR 1054 Unknown column → 所有确认/异议 500。
-    // 条件更新同时充当并发闸门：只有 GENERATED 能变更，affected=0 即状态不合法。
-    const affected = await this.prisma.$executeRaw(
-      Prisma.sql`UPDATE settlement_reports SET status = ${targetStatus}, confirmedAt = ${dto.confirm ? new Date() : null}, disputeReason = ${dto.confirm ? null : (dto.disputeReason ?? null)} WHERE id = ${id} AND status = 'GENERATED'`,
-    );
-    if (affected === 0) {
+    // 并发闸门：updateMany 的 WHERE 同时含 id 与 status='GENERATED'，count===0 即状态不合法（已确认/已异议）。
+    // 刻意不走 $executeRaw：本案 Prisma 原生 SQL 在 MySQL 连接下会把中文参数写成 '?'（latin1 编码问题），
+    // 改用 Prisma 标准方法（与 seed 写入中文一致，字符集正常）—— 见 docs/06 S4.2 已知限制。
+    const affected = await this.prisma.settlementReport.updateMany({
+      where: { id, status: ReportStatus.GENERATED },
+      data: {
+        status: targetStatus,
+        confirmedAt: dto.confirm ? new Date() : null,
+        disputeReason: dto.confirm ? null : dto.disputeReason ?? null,
+      },
+    });
+    if (affected.count === 0) {
       // 区分冻结 / 不可确认
       if (report.status === ReportStatus.CONFIRMED) {
         throw BizException.conflict(ReasonCode.SETTLEMENT_FROZEN, '对账单已确认冻结，不可再操作');
@@ -279,10 +285,8 @@ export class SettlementService {
     const detail = (report.detail as unknown as SettlementDetail | null) ?? { redemptions: [], purchases: [] };
     const header = ['券码', '用户', '核销时间', '门店', '面值', '抵扣金额'];
     const rows = detail.redemptions.map((r) => [r.code, String(r.userId), new Date(r.redeemedAt).toISOString(), r.storeName ?? '', String(r.faceValue), String(r.discountAmount)]);
-    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
-    const csv = [header, ...rows].map((row) => row.map(esc).join(',')).join('\r\n');
-    // UTF-8 BOM：Excel 打开中文不乱码
-    return '\ufeff' + csv;
+    // 统一走 common/utils/csv.util（S4.3 抽出），与报表中心导出保持同一格式：BOM + 引号转义
+    return toCsv(header, rows);
   }
 
   // ---------------------------------------------------------------- 内部工具

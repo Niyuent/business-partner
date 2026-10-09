@@ -19,6 +19,7 @@ import { PointModule } from './modules/point/point.module';
 import { OrderModule } from './modules/order/order.module';
 import { PurchaseModule } from './modules/purchase/purchase.module';
 import { SettlementModule } from './modules/settlement/settlement.module';
+import { ReportModule } from './modules/report/report.module';
 
 /**
  * 全站默认鉴权策略：**拒绝未声明的**。
@@ -56,6 +57,8 @@ import { SettlementModule } from './modules/settlement/settlement.module';
     PurchaseModule,
     // S4.2：对账账单
     SettlementModule,
+    // S4.3：报表中心（六张报表 + CSV 导出）与工作台（stats / trend / todo）
+    ReportModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
