@@ -68,7 +68,7 @@ docker build -f deploy/Dockerfile.gateway -t shangmeng-gateway .  # 网关（内
 - [x] S1 商家与权限：auth（权限五表 + 登录 + JwtAuthGuard / RolesGuard / MerchantScopeGuard）、入驻审核 / 商家管理 / 授权管理 / 操作日志
 - [x] S2 代金券：券模板管理 / 券码预生成 / 券实例发放 / 核销与冲正（S2.4 全量回归 60 条断言全过）
 - [x] S3 积分与订单：积分账户与 FIFO 流水 / 积分兑换 / 过期清零定时任务 / 订单管理与异常订单处理
-- [ ] S4 采购对账报表：S4.1 采购记录 ✅、S4.2 对账账单 ✅（18/0）、S4.3 报表中心 ⬜
+- [ ] S4 采购对账报表：S4.1 采购记录 ✅、S4.2 对账账单 ✅（18/0）、S4.3.1 后端接口+Swagger ✅、S4.3.2 报表页 ⬜、S4.3.3 工作台图表 ⬜
 - [ ] S5 附属侧 + 通知 + 用户管理
 - [ ] S6 H5 简版 + 联调
 
