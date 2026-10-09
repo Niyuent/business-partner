@@ -758,6 +758,8 @@ model SettlementReport {
   generatedBy  Int?         @db.UnsignedInt
   generatedAt  DateTime     @default(now())
   confirmedAt  DateTime?
+  // S4.2 收口：异议原因此前只落 audit_logs，账单详情无法回显；改为同时落账单表便于前台展示
+  disputeReason String?     @db.VarChar(500)
 
   merchant Merchant? @relation(fields: [merchantId], references: [id])
 

@@ -24,7 +24,7 @@
         <el-form-item>
           <el-button type="primary" :loading="loading" @click="onSearch">查询</el-button>
           <el-button v-if="canGenerate" @click="genVisible = true">生成对账单</el-button>
-          <el-button :disabled="!filtered.length" @click="onExport">导出 CSV</el-button>
+          <el-button :disabled="!total" @click="onExport">导出 CSV</el-button>
         </el-form-item>
       </el-form>
 
@@ -145,8 +145,6 @@ const canGenerate = computed(() => userStore.permissions.includes('settlement:ge
 const canConfirm = computed(() => userStore.permissions.includes('settlement:confirm'));
 
 const list = ref<SettlementItem[]>([]);
-/** 当前筛选条件下的**全部**结果（不只当前页），导出 CSV 用它，避免「只导了一页」的坑 */
-const filtered = ref<SettlementItem[]>([]);
 const total = ref(0);
 const loading = ref(false);
 const query = reactive({
@@ -157,28 +155,35 @@ const query = reactive({
   merchantId: undefined as number | undefined,
 });
 
+/** 'YYYY-MM' → 账期起止（UTC）。Prisma DateTime 存 UTC，必须在 UTC 边界上比对 */
+function monthRange(month: string) {
+  const [y, m] = month.split('-').map(Number);
+  return {
+    periodStart: new Date(Date.UTC(y, m - 1, 1)).toISOString(),
+    periodEnd: new Date(Date.UTC(y, m, 1)).toISOString(),
+  };
+}
+
+/** 当前筛选条件的查询参数（列表与导出共用，避免两处口径漂移） */
+function currentFilters() {
+  return {
+    merchantId: query.merchantId || undefined,
+    status: query.status || undefined,
+    ...(query.month ? monthRange(query.month) : {}),
+  };
+}
+
 async function load() {
   loading.value = true;
   try {
-    // 后端 list 暂不支持按 period 过滤（QuerySettlementsDto 只有 merchantId / status），
-    // 「账期月份」在前端完成：对账单天然稀疏（每月每商家一份），按 200 条上限拉全再匹配 YYYY-MM。
-    const useFrontendFilter = !!query.month;
+    // 账期筛选已下推到后端（periodStart / periodEnd），不再前端拉全量过滤
     const res = await settlementApi.list({
-      page: 1,
-      pageSize: useFrontendFilter ? 200 : query.pageSize,
-      merchantId: query.merchantId || undefined,
-      status: query.status || undefined,
+      page: query.page,
+      pageSize: query.pageSize,
+      ...currentFilters(),
     });
-    const rows = useFrontendFilter ? res.list.filter((r) => r.periodStart.slice(0, 7) === query.month) : res.list;
-    filtered.value = rows;
-    if (useFrontendFilter) {
-      total.value = rows.length;
-      const start = (query.page - 1) * query.pageSize;
-      list.value = rows.slice(start, start + query.pageSize);
-    } else {
-      list.value = rows;
-      total.value = res.total;
-    }
+    list.value = res.list;
+    total.value = res.total;
   } finally {
     loading.value = false;
   }
@@ -207,16 +212,11 @@ async function submitGenerate() {
     ElMessage.warning('请选择账期月份');
     return;
   }
-  const [y, m] = genForm.month.split('-').map(Number);
-  // UTC 边界：与后端 Prisma DateTime（存 UTC）保持一致
-  const periodStart = new Date(Date.UTC(y, m - 1, 1));
-  const periodEnd = new Date(Date.UTC(y, m, 1));
   submitting.value = true;
   try {
     const r = await settlementApi.generate({
       merchantId: genForm.merchantId ?? null,
-      periodStart: periodStart.toISOString(),
-      periodEnd: periodEnd.toISOString(),
+      ...monthRange(genForm.month),
     });
     ElMessage.success(`对账单 ${r.reportNo} 已生成，核销金额 ${r.totalAmount}`);
     genVisible.value = false;
@@ -258,14 +258,16 @@ async function submitAction() {
 }
 
 // ---------------------------------------------------------------- 导出
-/** 导出 CSV（纯前端）：导出的是「当前筛选条件的全部结果」，不受分页限制 */
-function onExport() {
-  if (!filtered.value.length) {
+/** 导出 CSV（纯前端拼装，数据走后端筛选）：导出「当前筛选条件的全部结果」，不受分页限制 */
+async function onExport() {
+  // 单独按 200 条上限拉一次当前筛选结果，避免只导出当前页
+  const res = await settlementApi.list({ page: 1, pageSize: 200, ...currentFilters() });
+  if (!res.list.length) {
     ElMessage.warning('没有可导出的数据');
     return;
   }
   const header = ['对账单号', '商家', '账期开始', '账期结束', '核销金额', '核销笔数', '采购笔数', '状态', '生成时间', '确认时间'];
-  const rows = filtered.value.map((r) => [
+  const rows = res.list.map((r) => [
     r.reportNo,
     r.merchantName || '全平台',
     dateOnly(r.periodStart),
@@ -290,7 +292,7 @@ function onExport() {
   a.download = `对账账单_${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
-  ElMessage.success(`已导出 ${filtered.value.length} 条对账单`);
+  ElMessage.success(`已导出 ${res.list.length} 条对账单`);
 }
 
 onMounted(load);

@@ -86,6 +86,8 @@ export class SettlementService {
           generatedBy: user?.sub ?? null,
           generatedAt: new Date(),
           confirmedAt: null,
+          // 重新生成视为一次全新核算，清掉上一轮异议原因，避免旧原因误导
+          disputeReason: null,
         },
       });
       await this.audit.record({
@@ -196,6 +198,9 @@ export class SettlementService {
         {
           ...(query.merchantId ? { merchantId: query.merchantId } : {}),
           ...(query.status ? { status: query.status as ReportStatus } : {}),
+          // 账期筛选（后端完成，不再依赖前端拉全量过滤）
+          ...(query.periodStart ? { periodStart: { gte: new Date(query.periodStart) } } : {}),
+          ...(query.periodEnd ? { periodEnd: { lte: new Date(query.periodEnd) } } : {}),
         },
       ],
     };
@@ -239,7 +244,7 @@ export class SettlementService {
     // 此前 SQL 里写了 updatedAt 导致 ERROR 1054 Unknown column → 所有确认/异议 500。
     // 条件更新同时充当并发闸门：只有 GENERATED 能变更，affected=0 即状态不合法。
     const affected = await this.prisma.$executeRaw(
-      Prisma.sql`UPDATE settlement_reports SET status = ${targetStatus}, confirmedAt = ${dto.confirm ? new Date() : null} WHERE id = ${id} AND status = 'GENERATED'`,
+      Prisma.sql`UPDATE settlement_reports SET status = ${targetStatus}, confirmedAt = ${dto.confirm ? new Date() : null}, disputeReason = ${dto.confirm ? null : (dto.disputeReason ?? null)} WHERE id = ${id} AND status = 'GENERATED'`,
     );
     if (affected === 0) {
       // 区分冻结 / 不可确认
@@ -324,6 +329,7 @@ export class SettlementService {
       status: r.status,
       totalAmount: Number(r.totalAmount),
       totalCount: r.totalCount,
+      disputeReason: r.disputeReason,
       redemptionCount: detail.redemptions.length,
       purchaseCount: detail.purchases.length,
       generatedAt: r.generatedAt,

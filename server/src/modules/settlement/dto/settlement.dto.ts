@@ -19,6 +19,14 @@ export class QuerySettlementsDto {
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() merchantId?: number;
   @ApiPropertyOptional({ enum: ['GENERATING', 'GENERATED', 'CONFIRMED', 'DISPUTED'] })
   @IsOptional() @IsIn(['GENERATING', 'GENERATED', 'CONFIRMED', 'DISPUTED']) status?: string;
+
+  // 账期筛选（S4.2 收口：从前端过滤挪到后端）。传 YYYY-MM 的月份时，
+  // 前端按 UTC 展开成当月 1 日 ~ 次月 1 日，命中该月账期的账单。
+  @ApiPropertyOptional({ description: '账期开始下限（ISO8601）：periodStart >= 该值' })
+  @IsOptional() @IsISO8601() periodStart?: string;
+
+  @ApiPropertyOptional({ description: '账期结束上限（ISO8601）：periodEnd <= 该值' })
+  @IsOptional() @IsISO8601() periodEnd?: string;
 }
 
 export class ConfirmSettlementDto {

@@ -26,6 +26,9 @@
         <el-descriptions-item label="核销笔数">{{ detail?.totalCount }}</el-descriptions-item>
         <el-descriptions-item label="生成时间">{{ formatDateTime(detail?.generatedAt) }}</el-descriptions-item>
         <el-descriptions-item label="确认时间">{{ detail?.confirmedAt ? formatDateTime(detail.confirmedAt) : '—' }}</el-descriptions-item>
+        <el-descriptions-item v-if="detail?.disputeReason" label="异议原因">
+          <el-text type="danger">{{ detail.disputeReason }}</el-text>
+        </el-descriptions-item>
         <el-descriptions-item label="快照说明">生成时固化，后续核销/采购变化不影响本账单</el-descriptions-item>
       </el-descriptions>
 

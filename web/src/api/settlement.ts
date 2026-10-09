@@ -19,6 +19,8 @@ export interface SettlementItem {
   purchaseCount: number;
   generatedAt: string;
   confirmedAt: string | null;
+  /** 异议原因（S4.2 收口：提异议时同时落账单表，详情可回显；重新生成后清空） */
+  disputeReason: string | null;
 }
 
 /** 快照里的核销明细行（生成时固化，后续数据变化不影响） */
@@ -50,8 +52,15 @@ export interface SettlementDetail extends SettlementItem {
 }
 
 export const settlementApi = {
-  /** 列表（隔离在后端：附属只看自己，主体看全部） */
-  list(params: { page?: number; pageSize?: number; merchantId?: number; status?: string } = {}) {
+  /** 列表（隔离在后端：附属只看自己，主体看全部；periodStart / periodEnd 为「账期」筛选） */
+  list(params: {
+    page?: number;
+    pageSize?: number;
+    merchantId?: number;
+    status?: string;
+    periodStart?: string;
+    periodEnd?: string;
+  } = {}) {
     return http<PageResult<SettlementItem>>({ url: '/settlements', method: 'GET', params });
   },
   detail(id: number) {
