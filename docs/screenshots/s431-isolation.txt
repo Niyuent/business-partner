@@ -1,0 +1,28 @@
+=== S4.3.1 数据隔离越权用例（2026-10-09）===
+环境：seed 基线；sub01(SUB_ADMIN,m=2) 与 clerk01(STORE_CLERK,storeId=101) 已临时授予 report:view；sub02(SUB_ADMIN_BASIC) 无 report:view
+
+[用例1] 附属 A(sub01,m=2) 查 /reports/coupon-summary → 只看到自己
+  API total = 1
+  SQL基准(issuerMerchantId=2) = 1  → ✓ 一致
+  主体admin total = 4 (>= 1)  → ✓ 附属为全平台子集
+  结论：隔离生效（附属只看自己发行的券）
+
+[用例2] 附属 A 查 /reports/coupon-summary?merchantId=3(B) → 强制改写
+  带 merchantId=3 total = 1
+  不带参数 total = 1  → ✓ 传入被忽略，仍只看自己
+  结论：强制收敛到自身，未越权看 B
+
+[用例3] 店员(clerk01,storeId=101,m=2) 查 /reports/orders-summary → 只看到本店
+  API count = 1
+  SQL基准(storeId=101) = 1  → ✓ 一致
+  sub01(m=2 全店) count = 2 (>= 1)  → ✓ storeId 收敛
+  结论：隔离生效
+
+[用例4] 附属 A 查 /reports/store-settlement → 只看到自己作为 sub
+  附属 byMerchant = [2]  → ✓ 仅 m=2
+  主体 byMerchant = [2,3]  → ✓ 全平台
+  结论：隔离生效
+
+[对照] 未授权附属 sub02(SUB_ADMIN_BASIC) 查 /reports/coupon-summary → 403
+  HTTP code = 403  → ✓ 权限拦截，不看任何数据
+

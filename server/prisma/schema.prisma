@@ -550,6 +550,8 @@ model CouponInstance {
   @@index([userId, status])
   @@index([templateId, status])
   @@index([expireAt])
+  @@index([issuerMerchantId, obtainedAt])
+  @@index([obtainedAt])
   @@map("coupon_instances")
 }
 
@@ -594,6 +596,8 @@ model PointTransaction {
   couponInstance CouponInstance? @relation(fields: [relatedCouponInstanceId], references: [id])
 
   @@index([userId, type, createdAt])
+  @@index([merchantId, storeId, createdAt])
+  @@index([createdAt])
   @@index([expireAt, remainingAmount])
   // 幂等键（S3.3 积分过期清零）：同一 EARN 批次只能有一条 EXPIRE 流水。
   // sourceTransactionId 对 EARN/SPEND 等非 EXPIRE 类型恒为 NULL，MySQL 唯一索引允许多个 NULL，不冲突。
@@ -682,6 +686,8 @@ model Order {
   couponInstance CouponInstance? @relation(fields: [couponInstanceId], references: [id])
 
   @@index([merchantId, storeId, createdAt])
+  @@index([merchantId, storeId, consumeTime])
+  @@index([consumeTime])
   @@index([userId])
   @@map("orders")
 }
