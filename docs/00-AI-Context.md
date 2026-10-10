@@ -60,8 +60,9 @@ docs/                 00-AI-Context(本文件) · 01~06 · archive/test-scripts/
 
 ## 6. 当前进度 & 下一步
 
-- **当前**：S4 收口完成。回归 **140/0**（`docs/screenshots/s4-regression.txt`）。
-- **下一步**：**S5 附属侧 + 通知 + 主体用户管理**（详见第 10 节）。
+- **当前**：**S5 进行中**。S4 收口完成（回归 140/0）；**S5.1 C 端用户鉴权** 已完成（14/0，`docs/screenshots/s51-api-cases.txt`）。
+- **回归入口**：`npm run regression`（seed 一次 → 顺序跑 S1/S2/S3.1/S3.2/S3.3/S3.4/S4.1/S4.2；S5.1 另有 `tmp-s51-cases.mjs`）。
+- **下一步**：S5.2 用户管理 → S5.3 门店变更 → S5.4 通知 + 附属侧补齐（每批停下验收）。
 
 ## 7. 关键约定（必须遵守）
 
@@ -94,13 +95,17 @@ node docs/archive/test-scripts/tmp-s32-cases.mjs   # …… 依次
 - **稳定主键**：merchant 1/2/3/4；store 101/102/201；admin 1/2/3/4/5；user 1001/1002；模板 1001/1002/1003/2001/1004。
 - **验收脚本**：`docs/archive/test-scripts/tmp-s3x/s4x-cases.mjs`；证据 `docs/screenshots/*`。
 
-## 9. C 端鉴权现状（S4 收口必答）
+## 9. C 端鉴权现状（S5.1 已实现）
 
-- **结论：C 端目前没有独立登录/鉴权体系，是「借用后台 token」的临时方案。**
-- `users` 表只是**业务主体**（积分账户 / 券实例 / 订单的归属），不参与鉴权；`admin_users` 才是鉴权主体（JWT + RBAC）。两表**无鉴权关系**。
-- H5（`web/src/views/h5/*`）用「**模拟用户 id 输入框**」切换身份，接口仍走 `/api/v1/*` 的后台鉴权（复用 localStorage 里的后台 `token`）——即「后台登录态 + 手工指定 `userId`」。
-- 积分相关接口以 `userId` 入参（后台代客兑换 / H5 均传 `userId`），当前**不校验**「token 用户 === 请求 userId」（因 C 端无独立身份）。
-- **S5 需决策**：是否引入 C 端独立登录（微信 `code2session` → 签发 C 端 token），并对 H5 接口强制 `token.userId === 请求 userId`；届时 `users` 与鉴权体系建立关联。
+- **结论：C 端已引入独立登录**（S5.1，2026-10-10）。
+- `users` 表仍是**业务主体**（积分账户 / 券实例 / 订单归属）；`admin_users` 是后台鉴权主体。**鉴权已分开**：
+  - 后台令牌：`POST /auth/login`，载荷含 `sub`=adminUser.id（无 `kind`）。
+  - C 端令牌：`POST /auth/user-login`（微信 code2session），载荷 `kind:'USER'` + `userId`=users.id。
+- **双向隔离**：后台接口（全局 `JwtAuthGuard`）拒绝 `kind:'USER'` 令牌；C 端接口 `/h5/**`（`UserJwtAuthGuard`）拒绝后台令牌。
+- C 端接口（`/api/v1/h5/**`）一律以**令牌 userId** 为准；`POST /h5/exchange` 若带 `userId` 且与令牌不符 → 403。
+- 前端：`utils/h5Request.ts`（`userToken`）+ `api/h5.ts` + `views/h5/login.vue`；`/h5/**` 路由守卫改用 `userToken`（与后台登录态解耦）。
+- 开发/模拟：未配置 `WX_APPID/WX_SECRET` 时 `WxService` 确定性模拟（`openid=dev_openid_<code>`）。
+- `users.openid/unionid` 已存在（`0_init`），unionid 为 S8「支付即积分」铺路。
 
 ## 10. S5 启动清单
 

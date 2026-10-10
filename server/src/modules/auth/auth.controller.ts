@@ -6,6 +6,7 @@ import { CurrentUser } from './current-user.decorator';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
+import { UserLoginDto } from './dto/user-login.dto';
 import { JwtPayload } from './jwt-payload';
 
 /**
@@ -27,6 +28,13 @@ export class AuthController {
   @ApiOperation({ summary: '账号密码登录，返回 token + 角色 + 权限码 + 商家上下文' })
   login(@Body() dto: LoginDto, @Ip() ip: string) {
     return this.auth.login(dto.username, dto.password, ip);
+  }
+
+  @Post('user-login')
+  @Public()
+  @ApiOperation({ summary: 'C 端登录（微信 code2session → 签发 C 端 JWT，仅可访问 /h5/**）' })
+  userLogin(@Body() dto: UserLoginDto) {
+    return this.auth.userLogin(dto.code);
   }
 
   @Get('profile')

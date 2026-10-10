@@ -5,6 +5,8 @@ import { BizException, ReasonCode } from '../../common/exceptions/biz.exception'
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { UpdatePasswordDto } from './dto/update-password.dto';
 import { JwtPayload } from './jwt-payload';
+import { UserJwtPayload } from './user-jwt-payload';
+import { WxService } from './wx.service';
 
 const BCRYPT_ROUNDS = 10;
 
@@ -48,7 +50,62 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly wx: WxService,
   ) {}
+
+  /**
+   * C 端登录（S5.1）：微信 code → openid/unionid → 找到/创建 users → 签发 C 端 JWT。
+   *
+   * 与后台登录**分离**：payload 带 `kind:'USER'`，只能访问 `/h5/**`。
+   * 用户不存在则按 openid 自动创建（phone 用确定性占位，保证唯一）。
+   */
+  async userLogin(code: string) {
+    const session = await this.wx.code2session(code);
+
+    let user = await this.prisma.user.findFirst({ where: { openid: session.openid } });
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: {
+          phone: `wx_${session.openid.slice(-16)}`,
+          nickname: '微信用户',
+          openid: session.openid,
+          unionid: session.unionid ?? null,
+          registeredAt: new Date(),
+        },
+      });
+    } else if (session.unionid && user.unionid !== session.unionid) {
+      user = await this.prisma.user.update({ where: { id: user.id }, data: { unionid: session.unionid } });
+    }
+
+    if (user.status !== 'ACTIVE') {
+      throw BizException.forbidden(ReasonCode.ACCOUNT_DISABLED, '用户已被禁用');
+    }
+
+    // 开积分账户（幂等）：新用户首次登录即拥有账户，避免 H5「我的积分」因无账户而 404
+    await this.prisma.pointAccount.upsert({ where: { userId: user.id }, create: { userId: user.id }, update: {} });
+
+    const payload: UserJwtPayload = {
+      kind: 'USER',
+      sub: user.id,
+      userId: user.id,
+      openid: session.openid,
+      unionid: user.unionid ?? null,
+    };
+
+    this.logger.log(`C 端登录成功 userId=${user.id} openid=${session.openid}`);
+
+    return {
+      accessToken: this.jwt.sign(payload),
+      expiresIn: process.env.JWT_EXPIRES_IN ?? '2h',
+      user: {
+        id: user.id,
+        nickname: user.nickname,
+        phone: user.phone,
+        openid: user.openid,
+        unionid: user.unionid,
+      },
+    };
+  }
 
   async login(username: string, password: string, ip?: string): Promise<LoginResult> {
     const account = await this.prisma.adminUser.findUnique({

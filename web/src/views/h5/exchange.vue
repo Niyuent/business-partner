@@ -2,24 +2,19 @@
   <div class="h5">
     <van-nav-bar title="积分兑换" />
 
-    <!-- MVP：还没有 C 端用户鉴权，这里用「模拟用户」切换身份；
-         真正的用户 token 鉴权属于 v2，接口口径（userId 入参）不变 -->
     <van-notice-bar
       left-icon="info-o"
-      color="#92400e"
-      background="#fffbeb"
-      text="MVP：H5 未接入用户鉴权，用上方「当前用户」切换模拟身份；接口与真实链路一致。"
+      color="#166534"
+      background="#f0fdf4"
+      text="S5.1：已用 C 端令牌登录（微信 code2session），userId 取自令牌，不再手工输入。"
     />
 
     <div class="h5__user">
       <span class="h5__user-label">当前用户</span>
-      <van-field
-        v-model="userIdInput"
-        type="digit"
-        placeholder="用户 id"
-        input-align="right"
-        @blur="onUserChange"
-      />
+      <span style="font-weight: 600; color: #1e293b">
+        {{ currentUser?.nickname || currentUser?.phone || '—' }}
+      </span>
+      <van-button size="mini" plain @click="onLogout">退出</van-button>
       <span v-if="account" class="h5__balance">
         积分 <b>{{ account.account.balance }}</b>
         <span class="h5__dim">（可用 {{ account.summary.available }}）</span>
@@ -107,16 +102,17 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { showDialog, showFailToast, showSuccessToast } from 'vant';
-import { couponTemplateApi } from '@/api/coupon-template';
-import { pointApi } from '@/api/point';
-import type { CouponTemplate, ExchangeRecord, ExchangeResult, PointAccountDetail } from '@/types/business';
+import { h5Api, type H5Template, type H5User } from '@/api/h5';
+import { h5Auth } from '@/utils/h5Request';
+import type { ExchangeRecord, ExchangeResult, PointAccountDetail } from '@/types/business';
 import { formatDateTime } from '@/utils/dict';
 
-const userIdInput = ref('1001');
-const userId = ref(1001);
+const router = useRouter();
+const currentUser = ref<H5User | null>(h5Auth.user<H5User>());
 const account = ref<PointAccountDetail | null>(null);
-const templates = ref<CouponTemplate[]>([]);
+const templates = ref<H5Template[]>([]);
 const records = ref<ExchangeRecord[]>([]);
 const loading = ref(false);
 const recLoading = ref(false);
@@ -130,24 +126,22 @@ const exchangeable = computed(() =>
   templates.value.filter((t) => t.status === 'PUBLISHED' && t.remainingStock > 0 && t.pointsCost > 0),
 );
 
-function canExchange(t: CouponTemplate) {
+function canExchange(t: H5Template) {
   return (account.value?.summary.available ?? 0) >= t.pointsCost;
 }
 
 async function loadAccount() {
   try {
-    account.value = await pointApi.accountDetail(userId.value);
-  } catch (e) {
+    account.value = await h5Api.account();
+  } catch {
     account.value = null;
-    showFailToast((e as Error).message || '加载积分账户失败');
   }
 }
 
 async function loadTemplates() {
   loading.value = true;
   try {
-    const res = await couponTemplateApi.list({ page: 1, pageSize: 50 });
-    templates.value = res.list;
+    templates.value = (await h5Api.templates()).list;
   } finally {
     loading.value = false;
   }
@@ -156,8 +150,7 @@ async function loadTemplates() {
 async function loadRecords() {
   recLoading.value = true;
   try {
-    const res = await pointApi.exchangeRecords({ page: 1, pageSize: 20, userId: userId.value });
-    records.value = res.list;
+    records.value = (await h5Api.exchangeRecords({ page: 1, pageSize: 20 })).list;
   } catch {
     records.value = [];
   } finally {
@@ -165,23 +158,23 @@ async function loadRecords() {
   }
 }
 
-function onUserChange() {
-  const id = Number(userIdInput.value);
-  if (!id) return;
-  userId.value = id;
-  loadAccount();
-  loadRecords();
+function onLogout() {
+  h5Auth.clear();
+  router.replace('/h5/login');
 }
 
 /**
  * 兑换：requestId 由前端生成一次并**在本次按钮点击内复用**（重试时不重新生成）。
- * 为什么不在每次请求时生成：双击 / 重试会拿到新的 requestId，幂等键就失效了，
- * 后端唯一索引拦不住「用户自己点了两次」。幂等键必须绑定「用户意图」，不是「HTTP 请求」。
+ * userId 取自 C 端令牌（仍显式带上，后端会校验「令牌 userId === 请求 userId」，伪造 → 403）。
  */
-function onExchange(t: CouponTemplate) {
+function onExchange(t: H5Template) {
   const requestId = crypto.randomUUID();
-  const payload = { userId: userId.value, templateId: t.id, requestId, channel: 'H5' as const };
   const tplName = t.name;
+  const userId = currentUser.value?.id;
+  if (!userId) {
+    showFailToast('未登录');
+    return;
+  }
 
   showDialog({
     title: '确认兑换',
@@ -195,7 +188,7 @@ function onExchange(t: CouponTemplate) {
     .then(async () => {
       submitId.value = t.id;
       try {
-        const res = await pointApi.exchange(payload);
+        const res = await h5Api.exchange({ userId, templateId: t.id, requestId, channel: 'H5' });
         result.value = res;
         if (res.idempotent) {
           showSuccessToast('已兑换过，为您展示上次那张券');
@@ -203,7 +196,6 @@ function onExchange(t: CouponTemplate) {
         successVisible.value = true;
         await Promise.all([loadAccount(), loadRecords()]);
       } catch (e) {
-        // 失败原因来自后端 reasonCode 的中文 message（余额不足 / 库存 / 限领 / 券码池）
         showFailToast((e as Error).message || '兑换失败');
       } finally {
         submitId.value = null;

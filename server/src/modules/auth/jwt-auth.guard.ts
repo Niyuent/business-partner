@@ -60,6 +60,11 @@ export class JwtAuthGuard implements CanActivate {
       throw BizException.unauthorized(ReasonCode.INVALID_CREDENTIALS, '令牌无效或已过期');
     }
 
+    // S5.1：C 端令牌（kind='USER'）不得访问后台接口（C 端只走 /h5/**，由 UserJwtAuthGuard 处理）
+    if ((payload as unknown as { kind?: string }).kind === 'USER') {
+      throw BizException.forbidden(ReasonCode.FORBIDDEN_SCOPE, 'C 端令牌不能访问后台接口');
+    }
+
     // 验签通过后回表确认账号当前是否仍然可用
     const account = await this.prisma.adminUser.findUnique({
       where: { id: payload.sub },

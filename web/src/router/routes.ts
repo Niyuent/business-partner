@@ -281,6 +281,17 @@ export const h5Routes: RouteRecordRaw[] = [
   },
 ];
 
+/**
+ * C 端登录页（S5.1）：独立于 H5Layout（不显示底部 tabbar）。
+ * 无后台登录态要求（`public`），登录成功后写 `userToken` 再进 /h5/**。
+ */
+export const h5LoginRoute: RouteRecordRaw = {
+  path: '/h5/login',
+  name: 'H5Login',
+  component: () => import('@/views/h5/login.vue'),
+  meta: { title: '登录', public: true },
+};
+
 export const profileRoute: RouteRecordRaw = {
   path: '/profile',
   name: 'Profile',

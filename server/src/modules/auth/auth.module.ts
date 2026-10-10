@@ -4,6 +4,8 @@ import { AuthController } from './auth.controller';
 import { ApiTokenGuard } from './api-token.guard';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { AuthService } from './auth.service';
+import { UserJwtAuthGuard } from './user-jwt-auth.guard';
+import { WxService } from './wx.service';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { MerchantScopeGuard } from '../../common/guards/merchant-scope.guard';
 
@@ -27,7 +29,7 @@ import { MerchantScopeGuard } from '../../common/guards/merchant-scope.guard';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard, ApiTokenGuard, RolesGuard, MerchantScopeGuard],
-  exports: [JwtModule, AuthService, JwtAuthGuard, ApiTokenGuard, RolesGuard, MerchantScopeGuard],
+  providers: [AuthService, JwtAuthGuard, UserJwtAuthGuard, WxService, ApiTokenGuard, RolesGuard, MerchantScopeGuard],
+  exports: [JwtModule, AuthService, JwtAuthGuard, UserJwtAuthGuard, WxService, ApiTokenGuard, RolesGuard, MerchantScopeGuard],
 })
 export class AuthModule {}

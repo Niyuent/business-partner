@@ -1,0 +1,32 @@
+S5.1 C 端用户鉴权 · 验收用例（curl/HTTP 实测）
+生成时间: 2026-10-10
+脚本: docs/archive/test-scripts/tmp-s51-cases.mjs
+命令: node docs/archive/test-scripts/tmp-s51-cases.mjs
+
+———— C 端登录（code2session 模拟） ————
+✅ [L1] user-login 走通并签发 C 端 token :: HTTP=201 userId=4004 openid=dev_openid_s51-1791621874282
+✅ [L2] 同一 code 再登录 → 同一用户（openid 幂等） :: 第二次 userId=4004
+✅ [L3] 缺 code → 400 :: HTTP=400 code must be longer than or equal to 1 c
+
+———— 令牌双向隔离 ————
+✅ [I1] C 端 token → 后台接口 /merchants → 403 :: HTTP=403 FORBIDDEN_SCOPE
+✅ [I2] C 端 token → 后台接口 /auth/profile → 403 :: HTTP=403 FORBIDDEN_SCOPE
+✅ [I3] 后台 token → C 端接口 /h5/points/account → 403 :: HTTP=403 FORBIDDEN_SCOPE
+✅ [I4] 无 token → /h5/** → 401 :: HTTP=401 INVALID_CREDENTIALS
+
+———— C 端令牌可用 ————
+✅ [C1] /h5/me → 200 :: HTTP=200 id=4004
+✅ [C2] /h5/points/account → 200 且新用户账户存在（余额 0） :: HTTP=200 balance=0
+✅ [C3] /h5/templates → 200 且每条含 status/pointsCost :: n=13
+✅ [C4] /h5/points/transactions → 200 :: HTTP=200 total=0
+
+———— userId 防伪 / 兑换 ————
+✅ [E1] 伪造 userId 兑换 → 403 FORBIDDEN_SCOPE :: HTTP=403 FORBIDDEN_SCOPE
+✅ [E2] 真实 userId 兑换（T2 需 5 分）→ 201 且返回券码 :: HTTP=201 code=3M2Z44EMTM6G cost=5
+✅ [E3] 兑换后余额 = 100 - 5 = 95 :: balance=95
+
+===== S5.1 结果：14 通过 / 0 失败 =====
+
+说明:
+- code2session 未配置 WX_APPID/WX_SECRET 时为确定性模拟（openid = dev_openid_<code>），口径与真实链路一致。
+- 截图（H5 登录页 / 我的积分 / 兑换）与 DevTools Network 证据由人工验收补（见 docs/06 S5.1）。

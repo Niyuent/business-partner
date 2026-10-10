@@ -2,23 +2,19 @@
   <div class="h5">
     <van-nav-bar title="积分明细" />
 
-    <!-- MVP：H5 未接入用户鉴权，用「模拟用户」切换身份；接口与真实链路一致 -->
     <van-notice-bar
       left-icon="info-o"
-      color="#92400e"
-      background="#fffbeb"
-      text="MVP：H5 未接入用户鉴权，用上方「当前用户」切换模拟身份；接口与真实链路一致。"
+      color="#166534"
+      background="#f0fdf4"
+      text="S5.1：已用 C 端令牌登录，userId 取自令牌（不再手工输入）。"
     />
 
     <div class="h5__user">
       <span class="h5__label">当前用户</span>
-      <van-field
-        v-model="userIdInput"
-        type="digit"
-        placeholder="用户 id"
-        input-align="right"
-        @blur="onUserChange"
-      />
+      <span style="font-weight: 600; color: #1e293b">
+        {{ currentUser?.nickname || currentUser?.phone || '—' }}
+      </span>
+      <van-button size="mini" plain @click="onLogout">退出</van-button>
       <span v-if="account" class="h5__balance">
         积分 <b>{{ account.account.balance }}</b>
         <span class="h5__dim">（可用 {{ account.summary.available }}）</span>
@@ -50,13 +46,15 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { showFailToast } from 'vant';
-import { pointApi } from '@/api/point';
+import { h5Api, type H5User } from '@/api/h5';
+import { h5Auth } from '@/utils/h5Request';
 import type { PointAccountDetail, PointTransaction, PointTxnType } from '@/types/business';
 import { formatDateTime, pointAmountText, pointTxnTypeLabel, POINT_TXN_TYPE_OPTIONS } from '@/utils/dict';
 
-const userIdInput = ref('1001');
-const userId = ref(1001);
+const router = useRouter();
+const currentUser = ref<H5User | null>(h5Auth.user<H5User>());
 const account = ref<PointAccountDetail | null>(null);
 const list = ref<PointTransaction[]>([]);
 const loading = ref(false);
@@ -74,7 +72,7 @@ function amountClass(amount: number) {
 
 async function loadAccount() {
   try {
-    account.value = await pointApi.accountDetail(userId.value);
+    account.value = await h5Api.account();
   } catch {
     account.value = null;
   }
@@ -83,10 +81,9 @@ async function loadAccount() {
 async function loadList() {
   loading.value = true;
   try {
-    const res = await pointApi.transactions({
+    const res = await h5Api.transactions({
       page: 1,
       pageSize: 100,
-      userId: userId.value,
       type: typeFilter.value === 'ALL' ? undefined : (typeFilter.value as PointTxnType),
     });
     list.value = res.list;
@@ -98,12 +95,9 @@ async function loadList() {
   }
 }
 
-function onUserChange() {
-  const id = Number(userIdInput.value);
-  if (!id) return;
-  userId.value = id;
-  loadAccount();
-  loadList();
+function onLogout() {
+  h5Auth.clear();
+  router.replace('/h5/login');
 }
 
 function onFilterChange() {

@@ -20,6 +20,7 @@ import { OrderModule } from './modules/order/order.module';
 import { PurchaseModule } from './modules/purchase/purchase.module';
 import { SettlementModule } from './modules/settlement/settlement.module';
 import { ReportModule } from './modules/report/report.module';
+import { H5Module } from './modules/h5/h5.module';
 
 /**
  * 全站默认鉴权策略：**拒绝未声明的**。
@@ -59,6 +60,8 @@ import { ReportModule } from './modules/report/report.module';
     SettlementModule,
     // S4.3：报表中心（六张报表 + CSV 导出）与工作台（stats / trend / todo）
     ReportModule,
+    // S5.1：C 端 / H5（微信登录、我的积分/券/兑换，仅 C 端令牌可访问）
+    H5Module,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

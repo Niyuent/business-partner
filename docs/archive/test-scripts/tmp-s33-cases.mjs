@@ -43,6 +43,12 @@ const scalar = (stmt) => query(stmt).split('\n')[0]?.trim() ?? '';
 
 const A = await login('admin');
 
+// 前置：先触发一次过期任务，清空「非本用例」的历史过期批次（如 seed 给张三(1001) 预置的过期批次），
+// 使后续「全局 processed / expiredAmount 计数」断言与脚本执行顺序无关（S5 起点任务：S3.3 独立化）。
+const normalize = await call('POST', 'tasks/points/expire', A, {});
+log(`（前置归一：清空历史过期批次 processed=${normalize.data?.processed ?? '-'}）`);
+log('');
+
 const PAST = "UTC_TIMESTAMP() - INTERVAL 1 DAY";
 const FUTURE = "UTC_TIMESTAMP() + INTERVAL 1 DAY";
 // S4 收口回归稳健性：原用 +1s 作「未来批次」边界，在 Docker（cp/exec/HTTP 延迟）下会抖动

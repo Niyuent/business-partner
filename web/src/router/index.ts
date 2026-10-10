@@ -3,6 +3,7 @@ import { useUserStore } from '@/stores/user';
 import {
   dashboardRoute,
   forbiddenRoute,
+  h5LoginRoute,
   h5Routes,
   mainRoutes,
   notFoundRoute,
@@ -26,6 +27,7 @@ const routes: RouteRecordRaw[] = [
     children: [dashboardRoute, profileRoute, ...mainRoutes, ...subRoutes],
   },
   // H5 移动端（积分兑换 / 积分明细）：独立布局，顶部 /h5 前缀，与后台互不干扰
+  h5LoginRoute,
   ...h5Routes,
   notFoundRoute,
 ];
@@ -47,6 +49,15 @@ const router = createRouter({
  * （JwtAuthGuard + RolesGuard + 数据可见范围），前端拦不住不代表能拿到数据。
  */
 router.beforeEach(async (to) => {
+  // C 端 /h5/**：与后台登录态**无关**，单独用 C 端令牌（userToken）判定（S5.1）
+  if (to.path.startsWith('/h5')) {
+    if (to.path === '/h5/login') return true;
+    if (!localStorage.getItem('userToken')) {
+      return { path: '/h5/login', query: { redirect: to.fullPath } };
+    }
+    return true;
+  }
+
   const userStore = useUserStore();
 
   if (to.meta.public) return true;
