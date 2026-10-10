@@ -64,6 +64,11 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       SSE_HEARTBEAT_MS: ${SSE_HEARTBEAT_MS:-30000}
       SSE_TICKET_TTL_MS: ${SSE_TICKET_TTL_MS:-60000}
+      # 微信登录（S5.1 / P0 安全加固）：WX_MODE 未配置默认 real（生产安全默认）。
+      # 本地开发用 mock（仅非生产 + 内网 IP 生效）；生产必须 real 且提供 APPID/SECRET，否则拒绝启动。
+      WX_MODE: ${WX_MODE:-real}
+      WX_APPID: ${WX_APPID:-}
+      WX_SECRET: ${WX_SECRET:-}
       TZ: ${TZ:-Asia/Shanghai}
       # MVP 上传落本地磁盘；后续换 OSS 时改 UploadService 实现即可
       UPLOAD_DIR: ${UPLOAD_DIR:-/app/uploads}

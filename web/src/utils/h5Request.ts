@@ -7,14 +7,19 @@ import type { ApiResponse } from '@/types/api';
  * 与后台请求层（`utils/request.ts`，用 `token`）**分离**：本层用 `userToken`（微信登录签发的 C 端 JWT），
  * 只访问 `/h5/**` 与 `/auth/user-login`；后台令牌访问 `/h5/**` 会被后端 403，反之亦然。
  */
-const TOKEN_KEY = 'userToken';
+// S5.1-Q2：C 端令牌 key 与后台 `admin_token` 显式分离；旧 key `userToken` 仅兜底读取
+const TOKEN_KEY = 'user_token';
+const LEGACY_TOKEN_KEY = 'userToken';
 const USER_KEY = 'h5User';
 
+const readToken = () => localStorage.getItem(TOKEN_KEY) || localStorage.getItem(LEGACY_TOKEN_KEY) || '';
+
 export const h5Auth = {
-  token: () => localStorage.getItem(TOKEN_KEY) || '',
-  isLogin: () => !!localStorage.getItem(TOKEN_KEY),
+  token: () => readToken(),
+  isLogin: () => !!readToken(),
   set: (token: string, user: unknown) => {
     localStorage.setItem(TOKEN_KEY, token);
+    localStorage.removeItem(LEGACY_TOKEN_KEY);
     localStorage.setItem(USER_KEY, JSON.stringify(user ?? null));
   },
   user: <T = { id: number; nickname?: string | null; phone?: string | null }>(): T | null => {
@@ -23,6 +28,7 @@ export const h5Auth = {
   },
   clear: () => {
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(LEGACY_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
   },
 };

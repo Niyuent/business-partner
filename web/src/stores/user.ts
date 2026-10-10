@@ -2,7 +2,10 @@ import { defineStore } from 'pinia';
 import { authApi } from '@/api/auth';
 import type { LoginParams, LoginResult, UserProfile } from '@/types/business';
 
-const TOKEN_KEY = 'token';
+// S5.1-Q2：后台令牌 key 与 C 端 `user_token` 显式分离；旧 key `token` 仅兜底读取
+const TOKEN_KEY = 'admin_token';
+const LEGACY_TOKEN_KEY = 'token';
+const readToken = () => localStorage.getItem(TOKEN_KEY) || localStorage.getItem(LEGACY_TOKEN_KEY) || '';
 
 interface UserState {
   token: string;
@@ -17,7 +20,7 @@ interface UserState {
  */
 export const useUserStore = defineStore('user', {
   state: (): UserState => ({
-    token: localStorage.getItem(TOKEN_KEY) || '',
+    token: readToken(),
     profile: null,
     mustChangePassword: false,
   }),
@@ -36,6 +39,7 @@ export const useUserStore = defineStore('user', {
       this.token = res.accessToken;
       this.mustChangePassword = res.mustChangePassword;
       localStorage.setItem(TOKEN_KEY, res.accessToken);
+      localStorage.removeItem(LEGACY_TOKEN_KEY); // 迁移旧 key
       await this.fetchProfile();
       return res;
     },
@@ -52,6 +56,7 @@ export const useUserStore = defineStore('user', {
       this.profile = null;
       this.mustChangePassword = false;
       localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(LEGACY_TOKEN_KEY);
     },
   },
 });

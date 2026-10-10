@@ -20,6 +20,8 @@ const SCRIPTS = [
   ['tmp-s34-cases', 'S3.4 订单与异常订单处理'],
   ['tmp-s41-cases', 'S4.1 采购记录'],
   ['tmp-s42-cases', 'S4.2 对账账单'],
+  ['tmp-s51-cases', 'S5.1 C 端用户鉴权'],
+  ['tmp-s52-cases', 'S5.2 用户管理'],
 ];
 
 const summaryOf = (out) =>

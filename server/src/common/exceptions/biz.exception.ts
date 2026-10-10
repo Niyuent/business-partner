@@ -169,6 +169,8 @@ export const ReasonCode = {
   // S4.2 对账账单
   // 同 (merchantId, period) 已存在且非 DISPUTED，幂等返回已存在（不重复创建）
   SETTLEMENT_ALREADY_EXISTS: 'SETTLEMENT_ALREADY_EXISTS',
+  // S5.2 用户管理：手机号被占用（手机号全局唯一）
+  USER_PHONE_EXISTS: 'USER_PHONE_EXISTS',
   // CONFIRMED 后冻结，不可再 confirm/dispute
   SETTLEMENT_FROZEN: 'SETTLEMENT_FROZEN',
   // 非 GENERATED 状态不能 confirm/dispute（如 DISPUTED 必须先重新生成）

@@ -69,7 +69,7 @@ docker build -f deploy/Dockerfile.gateway -t shangmeng-gateway .  # 网关（内
 - [x] S2 代金券：券模板管理 / 券码预生成 / 券实例发放 / 核销与冲正（S2.4 全量回归 60 条断言全过）
 - [x] S3 积分与订单：积分账户与 FIFO 流水 / 积分兑换 / 过期清零定时任务 / 订单管理与异常订单处理
 - [x] S4 采购对账报表：S4.1 采购记录 ✅、S4.2 对账账单 ✅（18/0）、S4.3.1 后端接口+Swagger ✅、S4.3.2 报表页 ✅、S4.3.3 工作台图表 ✅（ECharts 按需引入：卡片+趋势+双饼+Top5，角色差异化 + dashboard:view 门禁）；**S4 收口回归 S3.1–S4.2 合计 140/0**（`docs/screenshots/s4-regression.txt`）
-- [ ] S5 附属侧 + 通知 + 用户管理：S5.1 C 端用户鉴权 ✅（14/0，`docs/screenshots/s51-api-cases.txt`）、S5.2 用户管理 ⬜、S5.3 门店变更 ⬜、S5.4 通知 + 附属侧 ⬜
+- [ ] S5 附属侧 + 通知 + 用户管理：S5.1 C 端用户鉴权 ✅（14/0）、S5.2 用户管理 ✅（15/0，`docs/screenshots/s52-api-cases.txt`）、S5.3 门店变更 ⬜、S5.4 通知 + 附属侧 ⬜
 - [ ] S6 H5 简版 + 联调
 
 > **下一阶段：S5 附属侧 + 通知 + 主体用户管理**（启动清单见 [`docs/00-AI-Context.md`](docs/00-AI-Context.md)）。

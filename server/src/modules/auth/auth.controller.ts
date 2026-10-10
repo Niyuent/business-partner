@@ -2,6 +2,7 @@ import { Body, Controller, Get, Ip, Post, Put } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AllowPasswordChangeRequired } from '../../common/decorators/allow-password-change.decorator';
 import { Public } from '../../common/decorators/public.decorator';
+import { RateLimitService } from '../../common/services/rate-limit.service';
 import { CurrentUser } from './current-user.decorator';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -21,7 +22,10 @@ import { JwtPayload } from './jwt-payload';
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly rateLimit: RateLimitService,
+  ) {}
 
   @Post('login')
   @Public()
@@ -33,8 +37,10 @@ export class AuthController {
   @Post('user-login')
   @Public()
   @ApiOperation({ summary: 'C 端登录（微信 code2session → 签发 C 端 JWT，仅可访问 /h5/**）' })
-  userLogin(@Body() dto: UserLoginDto) {
-    return this.auth.userLogin(dto.code);
+  userLogin(@Body() dto: UserLoginDto, @Ip() ip: string) {
+    // 公开登录接口限流：同 IP 每分钟最多 20 次（防爆破 / 灌水）
+    this.rateLimit.check(`user-login:${ip ?? 'unknown'}`, 20, 60 * 1000);
+    return this.auth.userLogin(dto.code, ip);
   }
 
   @Get('profile')

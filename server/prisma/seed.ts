@@ -335,6 +335,8 @@ async function main() {
     ['purchase:settle', '采购记录结算', 'settlement'],
     // S4.2 对账账单
     ['settlement:generate', '生成对账单', 'settlement'],
+    // S5.2 用户管理（追加在末尾，避免打乱既有权限码的固定主键 1..N）
+    ['user:edit', '编辑用户', 'user'],
   ];
 
   const permissionSeeds: Array<{ id: number; code: string; name: string; group: string }> = [];
@@ -375,6 +377,8 @@ async function main() {
     // 谁出钱谁结算，谁被结算谁确认。
     'settlement:confirm',
     'notification:view',
+    // S5.2：附属可查看（隔离到「本商家消费过的」）用户；编辑权 user:edit 归主体/平台
+    'user:view',
     // S4.3.2.1：附属可查看（数据隔离到自身）并导出报表
     'report:view',
     'report:export',
@@ -398,6 +402,8 @@ async function main() {
     'point:exchange:view',
     // S4.3.2.1 / P0：门店店员可查看（隔离到本店）报表，但**不给导出**权限（report:export 仅主体/附属管理员持有）
     'report:view',
+    // S5.2：店员可查看（隔离到「本店消费过的」）用户
+    'user:view',
   ];
 
   const roleDefs: Array<[number, string, string, RoleScope, string[]]> = [

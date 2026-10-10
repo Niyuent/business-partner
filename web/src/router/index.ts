@@ -10,6 +10,7 @@ import {
   profileRoute,
   subRoutes,
 } from './routes';
+import { h5Auth } from '@/utils/h5Request';
 
 const routes: RouteRecordRaw[] = [
   {
@@ -52,7 +53,7 @@ router.beforeEach(async (to) => {
   // C 端 /h5/**：与后台登录态**无关**，单独用 C 端令牌（userToken）判定（S5.1）
   if (to.path.startsWith('/h5')) {
     if (to.path === '/h5/login') return true;
-    if (!localStorage.getItem('userToken')) {
+    if (!h5Auth.isLogin()) {
       return { path: '/h5/login', query: { redirect: to.fullPath } };
     }
     return true;

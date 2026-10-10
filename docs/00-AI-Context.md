@@ -60,9 +60,9 @@ docs/                 00-AI-Context(本文件) · 01~06 · archive/test-scripts/
 
 ## 6. 当前进度 & 下一步
 
-- **当前**：**S5 进行中**。S4 收口完成（回归 140/0）；**S5.1 C 端用户鉴权** 已完成（14/0，`docs/screenshots/s51-api-cases.txt`）。
-- **回归入口**：`npm run regression`（seed 一次 → 顺序跑 S1/S2/S3.1/S3.2/S3.3/S3.4/S4.1/S4.2；S5.1 另有 `tmp-s51-cases.mjs`）。
-- **下一步**：S5.2 用户管理 → S5.3 门店变更 → S5.4 通知 + 附属侧补齐（每批停下验收）。
+- **当前**：**S5 进行中**。S5.1 C 端用户鉴权 ✅、S5.2 用户管理 ✅；全量回归 `npm run regression` = **204/0**（S1/S2/S3.1–S3.4/S4.1/S4.2/S5.1/S5.2）。
+- **回归入口**：`npm run regression`（seed 一次 → 顺序跑全部阶段脚本，失败即停；含 S5.1/S5.2 用例）。
+- **下一步**：S5.3 门店变更申请 → S5.4 通知 + 附属侧补齐（每批停下验收）。
 
 ## 7. 关键约定（必须遵守）
 
@@ -104,27 +104,28 @@ node docs/archive/test-scripts/tmp-s32-cases.mjs   # …… 依次
 - **双向隔离**：后台接口（全局 `JwtAuthGuard`）拒绝 `kind:'USER'` 令牌；C 端接口 `/h5/**`（`UserJwtAuthGuard`）拒绝后台令牌。
 - C 端接口（`/api/v1/h5/**`）一律以**令牌 userId** 为准；`POST /h5/exchange` 若带 `userId` 且与令牌不符 → 403。
 - 前端：`utils/h5Request.ts`（`userToken`）+ `api/h5.ts` + `views/h5/login.vue`；`/h5/**` 路由守卫改用 `userToken`（与后台登录态解耦）。
-- 开发/模拟：未配置 `WX_APPID/WX_SECRET` 时 `WxService` 确定性模拟（`openid=dev_openid_<code>`）。
+- 开发/模拟：由 `WX_MODE` 显式控制（默认 `real`）；`mock` 仅非生产 + 回环/内网 IP 生效，生产缺 APPID/SECRET 拒绝启动；`/auth/user-login` 同 IP 20 次/分钟限流。
+- storage key：后台 `admin_token`、C 端 `user_token`（显式分离）。
 - `users.openid/unionid` 已存在（`0_init`），unionid 为 S8「支付即积分」铺路。
 
-## 10. S5 启动清单
+## 10. S5 进度与清单
 
-S5 范围（约 2 周）：
-- **S5.1 用户管理**：主体后台用户列表 / 详情 / 消费·积分·券记录。
-- **S5.2 门店变更申请**：附属提交 → 主体审核 → 生效。
-- **S5.3 通知落地**：站内信、SSE 推送、通知中心、已读未读。
-- **S5.4 附属侧完善**：本店订单 / 核销 / 采购 / 对账页面补齐。
+S5 范围（4 批，每批停下验收）：
+- **S5.1 C 端用户鉴权** ✅（微信 code2session + C 端 JWT + 双向隔离 + P0 限流/模拟安全）。
+- **S5.2 用户管理（主体后台）** ✅（`/main/users` 列表 / 详情 / 启停 / 绑手机号；附属/店员按「本店消费过」隔离）。
+- **S5.3 门店变更申请** ⬜（附属提交 → 主体审核 → 生效）。
+- **S5.4 通知 + 附属侧补齐** ⬜（站内信 / SSE / 通知中心；`/sub/orders|redemptions|purchases|settlements|notifications`）。
 
-**S5 起点必做**（S4 收口遗留）：
-1. **明确 C 端 `users` 与后台 `admin_users` 的鉴权关系**（见第 9 节，含是否引入 C 端独立登录）。
-2. **补写 S1 / S2 / S4.3 的回归脚本**（本轮只覆盖了 S3.1–S4.2；S1/S2/S4.3 无脚本），并入全量回归。
-3. 关注后台「用户管理」页（`/main/users`，当前为占位 `P('S5')`）。
+**S5 起点必做（S4 收口遗留）**
+1. ✅ C 端 `users` 与后台 `admin_users` 鉴权关系已明确（见第 9 节）。
+2. ✅ S1 / S2 回归脚本已补（`tmp-s1-cases.mjs` / `tmp-s2-cases.mjs`）；⬜ **S4.3 报表回归脚本仍缺**（S5 内补）。
+3. ✅ `/main/users` 已从占位替换为 S5.2 真实页。
 
-**S5 起点基线**：回归 140/0、S4 全部子阶段 ✅、`docs/06` S4 收口总表与反思已就位。
+**待认领池（S5.4 / S6 备选）**：需先有「按手机号录单」入口；未匹配手机号进池，用户绑定/注册后按 `users.phone` 自动认领。
 
 ## 11. 已知遗留 / 待办
 
 - S4 收口已修：`originBatchId` 唯一键冲突、`ensureAccount` 并发竞态 + P2002 精确化、`toCsv` 全字段加引号、S3.3 边界用例稳健性、S3.4/S3.1 回归脚本。
-- 待补：S1 / S2 / S4.3 回归脚本（S5 起点）。
+- 待补：S4.3 报表回归脚本（S5.1/S5.2 已并入 `npm run regression`；S1/S2 已补）。
 - 前端 S4.3.2.1 / S4.3.3 的浏览器视觉截图 + Network 截图（人工验收补）。
 - 迁移注意：本项目迁移文件与 DB 曾出现 drift，改 schema 优先写迁移而非 `migrate dev`。

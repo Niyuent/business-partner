@@ -113,8 +113,14 @@ export const mainRoutes: RouteRecordRaw[] = [
   {
     path: '/main/users',
     name: 'MainUsers',
-    component: P('S5'),
-    meta: { title: '用户管理', icon: 'User', permission: 'user:view', stage: 'S5' },
+    component: () => import('@/views/main/users.vue'),
+    meta: { title: '用户管理', icon: 'User', permission: 'user:view', stage: 'S5.2' },
+  },
+  {
+    path: '/main/users/:id',
+    name: 'UserDetail',
+    component: () => import('@/views/main/users-detail.vue'),
+    meta: { title: '用户详情', hidden: true, permission: 'user:view', stage: 'S5.2' },
   },
   {
     path: '/main/purchases',

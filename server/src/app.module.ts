@@ -21,6 +21,7 @@ import { PurchaseModule } from './modules/purchase/purchase.module';
 import { SettlementModule } from './modules/settlement/settlement.module';
 import { ReportModule } from './modules/report/report.module';
 import { H5Module } from './modules/h5/h5.module';
+import { UserModule } from './modules/user/user.module';
 
 /**
  * 全站默认鉴权策略：**拒绝未声明的**。
@@ -62,6 +63,8 @@ import { H5Module } from './modules/h5/h5.module';
     ReportModule,
     // S5.1：C 端 / H5（微信登录、我的积分/券/兑换，仅 C 端令牌可访问）
     H5Module,
+    // S5.2：用户管理（主体后台，附属/店员按「本商家/门店消费过的」隔离）
+    UserModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

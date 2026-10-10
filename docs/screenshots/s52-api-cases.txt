@@ -1,0 +1,34 @@
+S5.2 用户管理（主体后台）· 验收用例（HTTP 实测）
+生成时间: 2026-10-10
+脚本: docs/archive/test-scripts/tmp-s52-cases.mjs
+命令: node docs/archive/test-scripts/tmp-s52-cases.mjs
+造数: 临时用户 9001（商户 2 / 门店 101 有订单）、9002（仅商户 1 有订单），结尾清理
+
+———— 列表 / 筛选 / 权限 ————
+✅ [L1] admin 列表 200 且含临时用户 9001/9002 :: HTTP=200 total=4
+✅ [L2] 列表条目含积分/订单计数聚合字段 :: orderCount=1
+✅ [L3] 按手机号筛选命中 1 条 :: total=1
+✅ [L4] 附属 sub01 仅见「本商家消费过」的用户（含 9001、不含 9002） :: 含9001=true 含9002=false
+✅ [L5] 店员 clerk01 仅见本店消费过的用户（含 9001、不含 9002） :: 含9001=true 含9002=false
+
+———— 详情 / 越权 ————
+✅ [D1] admin 详情 200（基本信息 + 积分 + 券 + 消费 + 核销 + 来源商家） :: HTTP=200 orders=1 account={"balance":0,"totalEarned":0,"totalSpent":0}
+✅ [D2] 附属查看不在本商家消费的用户 9002 → 404（越权拦截） :: HTTP=404 RESOURCE_NOT_FOUND
+✅ [D3] 用户不存在 → 404 :: HTTP=404 RESOURCE_NOT_FOUND
+
+———— 启停（user:edit） ————
+✅ [E1] 附属（无 user:edit）启停 → 403 :: HTTP=403 PERMISSION_DENIED
+✅ [E2] admin 禁用 → 200 且状态变更 :: HTTP=200 status=DISABLED
+✅ [E3] 禁用写审计 :: audit 0→1
+✅ [E4] 重复禁用 → 幂等（unchanged=true） :: HTTP=200 unchanged=true
+
+———— 绑定手机号（唯一性） ————
+✅ [B1] 绑定已被占用的手机号 → 409 USER_PHONE_EXISTS :: HTTP=409 USER_PHONE_EXISTS
+✅ [B2] 绑定新手机号 → 200 且落库 :: HTTP=201 phone=13900009009
+✅ [B3] 手机号格式非法 → 400 :: HTTP=400
+
+===== S5.2 结果：15 通过 / 0 失败 =====
+
+说明:
+- 全量回归（npm run regression，含 S5.1/S5.2）合计 204/0。
+- 截图（/main/users 列表 / 详情）与 DevTools Network 由人工验收补。

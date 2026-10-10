@@ -59,8 +59,8 @@ export class AuthService {
    * 与后台登录**分离**：payload 带 `kind:'USER'`，只能访问 `/h5/**`。
    * 用户不存在则按 openid 自动创建（phone 用确定性占位，保证唯一）。
    */
-  async userLogin(code: string) {
-    const session = await this.wx.code2session(code);
+  async userLogin(code: string, ip?: string) {
+    const session = await this.wx.code2session(code, ip);
 
     let user = await this.prisma.user.findFirst({ where: { openid: session.openid } });
     if (!user) {
