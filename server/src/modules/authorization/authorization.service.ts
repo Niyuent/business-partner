@@ -313,8 +313,9 @@ export class AuthorizationService {
         reactivated: result.reactivated,
       };
     } catch (e) {
-      // 唯一约束兜底：两个请求同时首次授权时，会有一个撞上 (main,sub,authType)
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      // 唯一约束兜底：两个请求同时首次授权时，会有一个撞上 (main,sub,authType)。
+      // **精确匹配**该唯一索引，避免把其它唯一键误报为 AUTHORIZATION_EXISTS（S4 收口审计）。
+      if (this.isAuthUniqueViolation(e)) {
         await this.audit.record({
           ...auditBase,
           action: ACTION_GRANT,
@@ -743,6 +744,14 @@ export class AuthorizationService {
       revokedAt: row.revokedAt,
       revokeReason: row.revokeReason,
     };
+  }
+
+  /** P2002 是否**精确**命中授权唯一索引 (mainMerchantId, subMerchantId, authType) */
+  private isAuthUniqueViolation(e: unknown): boolean {
+    if (!(e instanceof Prisma.PrismaClientKnownRequestError) || e.code !== 'P2002') return false;
+    const target = (e as { meta?: { target?: unknown } }).meta?.target;
+    const s = Array.isArray(target) ? target.join(',') : String(target ?? '');
+    return s.includes('merchant_authorizations') || s.includes('authType');
   }
 
   private reasonCodeOf(e: unknown): string {

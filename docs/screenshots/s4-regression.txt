@@ -1,0 +1,173 @@
+S4.3 收口 · S1-S4 全量回归（自动化用例）
+生成时间: 2026-10-10
+执行方式: seed 一次（基线）→ 顺序执行 S3.2 → S3.1 → S3.3 → S3.4 → S4.1 → S4.2（任一失败即停）
+覆盖范围: S3.1 / S3.2 / S3.3 / S3.4 / S4.1 / S4.2 可自动化用例；
+          S1 / S2 / S4.3 的回归脚本按约定留到 S5 起点补写（见 docs/06「S4 收口反思」与 docs/00-AI-Context.md 的 S5 启动清单）。
+
+注意: S3.3 断言「全局 processed 计数」，因此必须在 S3.2（其 mkUser(1001) 会清掉 seed 预置的过期批次）之后执行，否则 seed 数据会造成假失败。
+
+========== S3.2 积分兑换代金券（FIFO / 幂等 / 并发 / 事务） ==========
+来源: docs/archive/test-scripts/tmp-s32-cases.mjs
+✅ [遗留1] platform 账号可登录且 userType=PLATFORM :: token=ok
+✅ [遗留1] platform 账号无商家归属（merchantId 为空） :: userType=PLATFORM merchant=null
+✅ [遗留1] 平台账号录单不传 merchantId → 400 MERCHANT_ID_REQUIRED :: HTTP 400 MERCHANT_ID_REQUIRED
+✅ [遗留1] 平台账号录单传 merchantId → 成功 :: HTTP 201 送 50 分
+✅ [遗留2] 不带 orderId/orderNo → 400 ORDER_ID_REQUIRED :: HTTP 400 ORDER_ID_REQUIRED | 消费录单送积分必须带 orderId 或 orderNo（一单只送一次积分靠它做幂等键）；人工调整请走 POST /points/adjust
+✅ [用例1] 兑换 120 成功，余额 230 → 110 :: HTTP 201 余额=110 券码=Z7SQ94VJB82F
+✅ [用例1] B(+10d) 50 → 0（最先过期，优先扣） :: 50 → 0
+✅ [用例1] C(+20d) 80 → 10（扣 70） :: 80 → 10
+✅ [用例1] A(+30d) 100 → 100（不动） :: 100 → 100
+✅ [用例1] 生成 2 条 SPEND 流水（-50 / -70），各指回券实例 :: SPEND 2 条：-70(批次扣减，实例#60021) -50(批次扣减，实例#60021)
+✅ [用例1] 券实例：source=EXCHANGE、归属主体商家、券码已绑定 :: source=EXCHANGE 券码=Z7SQ94VJB82F 发券方=1
+✅ [用例1b] 第一次兑换 60 → 批次剩 40，无 500 :: HTTP=201 批次#130213 剩 40
+✅ [用例1b] 第二次兑换 30（同一批次）→ 批次剩 10，无 500 :: HTTP=201 批次#130213 剩 10
+✅ [用例1b] 生成 2 条 SPEND，originBatchId 均指向批次 B :: SPEND=2 origin=130213,130213 批次#130213
+✅ [用例1b] SPEND 的 sourceTransactionId 为 NULL（唯一键仅约束 EXPIRE） :: source=,
+✅ [用例2] 并发 2 次兑换 → 1 成功 + 1×409 BALANCE_NOT_ENOUGH，无 500 :: HTTP=201/409 成功=1 reason=-/BALANCE_NOT_ENOUGH
+✅ [用例2] 余额未变负、只生成 1 张券 :: 余额 100 → 0；券实例数=1
+✅ [用例3] 两次都 200，第二次 idempotent=true 且返回同一张券 :: HTTP=201/201 券实例 60025 / 60025 idempotent=true
+✅ [用例3] 重复提交没有二次扣积分 :: 余额=100（110 - 10 = 100）
+✅ [用例3] 并发同一 requestId → 只生成 1 张券，无 500 :: HTTP=201/201 券实例 60026 / 60026
+✅ [用例4] A(已过期100) + B(未过期50)，兑换 80 → 409 BALANCE_NOT_ENOUGH :: HTTP 409 BALANCE_NOT_ENOUGH | 余额=150 可用=50 | 可用积分不足：需 80，未过期批次可用 50（过期积分不可用于兑换）
+✅ [F] 模板不存在 → 404 RESOURCE_NOT_FOUND :: HTTP 404 RESOURCE_NOT_FOUND
+✅ [F] 模板已下架 → 409 TEMPLATE_NOT_AVAILABLE :: HTTP 409 TEMPLATE_NOT_AVAILABLE
+✅ [F] 库存耗尽 → 409 STOCK_EXHAUSTED :: 首单 HTTP 201，第二单 HTTP 409 STOCK_EXHAUSTED | 券模板「S32 库存1张券」库存不足：本次需 1 张，剩余 0 张
+✅ [F] 券码池耗尽 → 409 CODE_POOL_EXHAUSTED :: 首单 HTTP 201，第二单 HTTP 409 CODE_POOL_EXHAUSTED | 券模板「S32 券码1个券」券码池已耗尽，请先预生成券码
+✅ [F] 超过 perUserLimit → 409 PER_USER_LIMIT_EXCEEDED :: 首单 HTTP 201，第二单 HTTP 409 PER_USER_LIMIT_EXCEEDED | 该用户已兑换「S32 限领1张券」1 张，达到限领 1 张
+✅ [F] 用户不存在 → 404 :: HTTP 404 RESOURCE_NOT_FOUND
+✅ [F] requestId 过短（<8 字符）→ 400 :: HTTP 400 requestId must be longer than or equal to 8 characters
+✅ [F] 模板未设兑换积分（pointsCost=0）→ 400 TEMPLATE_NOT_EXCHANGEABLE :: HTTP 400 TEMPLATE_NOT_EXCHANGEABLE | 券模板「S32 零分券」未设置兑换所需积分（pointsCost=0），不支持积分兑换
+✅ [F] 附属查与自己无关的兑换记录 → 403 FORBIDDEN_SCOPE :: HTTP 403 FORBIDDEN_SCOPE
+✅ [S] 兑换记录列表（券码 / 消耗积分 / 券状态） :: HTTP 200 共 3 条，样例 {"id":63,"userId":1003,"userName":"çŽ‹äº”","userPhone":"13800000003","templateId":2068,"templateName":"S32 限领1张券","faceValue":10,"couponInstanceId":60
+✅ [S] 店员代客兑换（T2 需 5 分） :: HTTP 201  消耗 5 分，券码 S7FST5KJM8NS | success
+✅ [S] 兑换后账户可用积分与余额一致扣减 :: 余额=15 可用=15
+✅ [S] 模板已发放数随兑换递增（条件更新生效） :: S32 幂等券 issuedCount=2（含并发 + 幂等重复提交各 1 次）
+✅ [用例9] 注入失败后请求失败（非 2xx） :: HTTP 500 服务器内部错误
+✅ [用例9] 积分未扣（余额不变） :: 100 → 100
+✅ [用例9] 券码未被占用（未发放数不变） :: 10 → 10
+✅ [用例9] 未生成券实例 / 兑换记录 / SPEND 流水 :: 实例=0 兑换记录=0 SPEND=0
+✅ [用例9] 移除注入后同一请求成功（失败是注入导致，不是逻辑错误） :: HTTP 201 券码=YCHTFCRX3QZ8
+S3.2 用例结果：通过 39 条，失败 0 条
+
+========== S3.1 积分账户 / 流水 / 消费录单 / 人工调整 / 规则 ==========
+来源: docs/archive/test-scripts/tmp-s31-cases.mjs
+✅ [S1] 账户列表 200 且含 balance/expiringSoon 字段 :: HTTP=200 total=11 keys=id,userId,userName,userPhone,balance,totalEarned,totalSpent,totalExpired,expiringSoon,version,updatedAt
+✅ [S2] 详情 balance=120 且 available=40（过期 80 不计入可用） :: balance=120 available=40
+✅ [S2] 过期批次 usable=false :: expiredBatch={"id":130236,"type":"ADJUST","amount":80,"remainingAmount":80,"expireAt":"2026-1
+✅ [S3] 录单送分 201 且 points=100 :: HTTP=201 points=100
+✅ [S3] EARN 批次有效期约 +12 月 :: expireAt=2027-10-10T08:19:42.858Z (~12 月)
+✅ [S4] 余额精确累加 = 100 :: balance=100
+✅ [S5] 人工 +50 成功且生成 ADJUST 流水 :: HTTP=201 ADJUST=1 amount=50
+✅ [S6] adjust 写 audit_logs :: audit=17
+✅ [S7] type=EARN 仅返回 EARN、type=ADJUST 仅返回 ADJUST :: EARN=1 ADJUST=1
+✅ [S8] 规则列表含平台默认(merchantId=0)与商家(merchantId=1) :: rules=27/m0 28/m1
+✅ [S8] 修改规则 earnRatio=2 生效并写审计 :: HTTP=200 earnRatio=2 audit=1
+✅ [S9] FIFO 先扣早过期批次A(50→20)、B(80 不动) :: A=20 B=80
+✅ [S10] 店员立单送分 201（门店由 JWT 推导） :: HTTP=201 points=60
+✅ [S11] 附属商家录单送分 201 :: HTTP=201 points=40
+✅ [F1] 用户不存在 → 404 :: HTTP=404 RESOURCE_NOT_FOUND
+✅ [F2] 订单不属于该用户 → 400 :: HTTP=400 RESOURCE_NOT_FOUND
+✅ [F3] 同订单重复送分 → 409 ORDER_POINTS_ALREADY_EARNED :: HTTP=409 ORDER_POINTS_ALREADY_EARNED
+✅ [F4] 原因 <5 字符 → 400 :: HTTP=400 reason must be longer than or equal to 5 characters
+✅ [F5] 零调整 → 400 INVALID_ADJUST_AMOUNT :: HTTP=400 INVALID_ADJUST_AMOUNT
+✅ [F6] 超额扣减（过期批次不算）→ 409 BALANCE_NOT_ENOUGH :: HTTP=409 BALANCE_NOT_ENOUGH
+✅ [F7] 附属查别家(merchant 1)流水 → 403 FORBIDDEN_SCOPE :: HTTP=403 FORBIDDEN_SCOPE
+✅ [F8] 附属查无本店流水用户 → 403 FORBIDDEN_SCOPE :: HTTP=403 FORBIDDEN_SCOPE
+✅ [F9] 店员人工调整 → 403 PERMISSION_DENIED :: HTTP=403 PERMISSION_DENIED
+✅ [F10] 附属改平台规则 → 403 :: HTTP=403 PERMISSION_DENIED
+✅ [F11] 附属传别家 merchantId → 403 FORBIDDEN_SCOPE :: HTTP=403 FORBIDDEN_SCOPE
+✅ [F12] 店员传别家门店 → 403 STORE_NOT_OWNED :: HTTP=403 STORE_NOT_OWNED
+✅ [F13] 未达起送金额 → 201 + earned:false :: HTTP=201 earned=false points=0
+✅ [C1] 并发录单同一订单 → 1×201 + 1×409，余额 +100（不翻倍） :: HTTP=201/409 balance=100
+✅ [C2] 同用户两笔不同订单并发 → 都 201，余额精确 +30 :: HTTP=201/201 reason=-/- balance=30
+✅ [C2b] 新用户首两笔不同订单并发 → 都 201，余额 +30，2 条 EARN :: HTTP=201/201 reason=-/- balance=30 EARN=2
+✅ [C2b] 只创建 1 个积分账户 :: accounts=1
+✅ [C3] 并发人工扣减 → 精确扣 20，无 500、无负数 :: HTTP=201/201 balance=80
+===== S3.1 结果：32 通过 / 0 失败 =====
+
+========== S3.3 积分过期清零（定时任务 / 手动触发） ==========
+来源: docs/archive/test-scripts/tmp-s33-cases.mjs
+✅ [用例1] 第一次触发处理 1 笔、过期 100 :: processed=1 expired=100
+✅ [用例1] 第二次触发处理 0 笔（幂等） :: processed=0 expired=0
+✅ [用例1] 账户清零 + totalExpired=100 + 仅 1 条 EXPIRE :: acct=0|100 expire=1
+✅ [用例2] 一次处理 2 笔、过期 150 :: processed=2 expired=150
+✅ [用例2] 余额 -150、生成 2 条 EXPIRE :: acct=0|150 expire=2
+✅ [用例3] 只处理 -1s 的 1 笔、过期 60 :: processed=1 expired=60
+✅ [用例3] +30s（未来）批次未动（remaining=40） :: remain(2003)=40
+✅ [用例3] -1s 批次已清零（balance=0） :: acct(2004)=0|60
+✅ [用例4] 只处理过期批次（1 笔 / 30 分） :: processed=1 expired=30
+✅ [用例4] 余额剩 40、未过期批次不动 :: acct=40|30 remain=0,40
+✅ [用例5] 并发触发只有 1 个实际处理（另一个跳过或 0 笔） :: a={processed:1,skipped:false} b={processed:0,skipped:true}
+✅ [用例5] 无重复 EXPIRE、余额扣一次 :: expire=1 acct=0|90
+✅ [用例6] 10000 条全部处理 :: processed=10000 expired=10000
+✅ [用例6] 耗时 < 30 秒（实际 10.29s） :: 10293 ms
+✅ [审计] 过期任务写审计日志（POINTS_EXPIRE） :: audit rows=7
+===== S3.3 结果：15 通过 / 0 失败 =====
+
+========== S3.4 订单管理与异常订单处理（取消回退 / 审计 / 隔离） ==========
+来源: docs/archive/test-scripts/tmp-s34-cases.mjs
+✅ [用例1] 处理返回成功（status=CANCELED） :: status=201 data.status=CANCELED
+✅ [用例1] 券回 UNUSED :: coupon=UNUSED
+✅ [用例1] 订单 couponInstanceId 清空 :: order=CANCELED|NULL|订单取消：券已退回，积分回退 50 分|1
+✅ [用例1] EARN 批次 remaining 恢复 100 :: remain=100
+✅ [用例1] 生成 1 条 REFUND 流水 + source 指回 E1 :: refund=1 src=90001
+✅ [用例1] 账户 balance 回 100 / totalSpent 回 0 :: acct=100|0|0
+✅ [用例1] 审计日志完整（ORDER_HANDLE） :: audit=1
+✅ [用例2] B.remaining 恢复 40 :: B.remain=40
+✅ [用例2] C.remaining 恢复 60 :: C.remain=60
+✅ [用例2] 生成 2 条 REFUND，source 指回 B、C :: refund=2 src=90010,90011
+✅ [用例2] 账户 balance 回 100 :: acct=100|0|0
+✅ [用例2b] B.remaining 恢复 40（但 expireAt 仍过期） :: B.remain=40 expired=1
+✅ [用例3] 标记 + 处理都有审计（2 条） :: audit=2
+✅ [用例3] 处理人/结果/时间落库（handled 而非删除） :: order=NORMAL|已冲正 50 分|1|2026-10-10 08:20:48.645
+✅ [用例3] 异常订单未删除（仍在库） :: order exists
+✅ [用例4] 并发处理只有 1 个成功，另 1 个 409 ORDER_ALREADY_HANDLED :: a=409/ORDER_ALREADY_HANDLED b=201/undefined
+✅ [用例5] 附属标记别家订单 → 403 STORE_NOT_OWNED :: status=403 reason=STORE_NOT_OWNED
+✅ [用例5] 附属处理本店 25 小时前异常 → 403（处理权归主体） :: status=403 reason=PERMISSION_DENIED
+✅ [用例5] 主体处理全平台订单成功 :: status=201
+✅ [补录] 补录订单 + 送积分（EARN 流水带 relatedOrderId） :: status=201 earn=1
+===== S3.4 结果：20 通过 / 0 失败 =====
+
+========== S4.1 采购记录（编号 / 隔离 / 结算 / 不可删除） ==========
+来源: docs/archive/test-scripts/tmp-s41-cases.mjs
+✅ [用例1] 新增成功，totalAmount = 50 :: status=201 total=50
+✅ [用例1] purchaseNo 格式 {main}-{sub}-{yyyymmdd}-{seq} :: purchaseNo=1-2-20261010-1
+✅ [用例1] 同 main-sub 同天 seq 递增（-2） :: purchaseNo=1-2-20261010-2
+✅ [用例1] 不同 sub 独立编号（1-3-...-1） :: purchaseNo=1-3-20261010-1
+✅ [用例2] 附属只看到自己作为 sub 的（2 条，subMerchantId 全为 2） :: list=[2,2]
+✅ [用例2] 主体看到全部（3 条） :: total=3
+✅ [用例3] 附属 query 查别家 → 403 FORBIDDEN_SCOPE :: status=403 reason=FORBIDDEN_SCOPE
+✅ [用例4] 主体结算成功（SETTLED） :: status=200 settle=SETTLED
+✅ [用例4] 重复结算 → 409（不可回退） :: status=409 reason=CONCURRENT_UPDATE
+✅ [用例4] 附属结算 → 403（结算权归主体） :: status=403 reason=PERMISSION_DENIED
+✅ [用例5] 无 DELETE 端点（404/405，采购不可删除） :: status=404
+✅ [用例6] 5 并发新增全部成功（无 500） :: 成功 5/5
+✅ [用例6] purchaseNo 互不重复 :: nos=["1-2-20261010-4","1-2-20261010-3","1-2-20261010-6","1-2-20261010-5","1-2-20261010-7"]
+✅ [用例7] settle 写 audit_logs（PURCHASE_SETTLE） :: settle=200 audit=1
+✅ [用例8] 附属(sub02)只看到自己作为 sub 的（subMerchantId 全为 3） :: list=[3]
+✅ [用例8] 附属查别家(merchant 2) → 403 FORBIDDEN_SCOPE :: status=403 reason=FORBIDDEN_SCOPE
+===== S4.1 结果：16 通过 / 0 失败 =====
+
+========== S4.2 对账账单（快照 / 幂等 / 状态机 / CSV / 性能） ==========
+来源: docs/archive/test-scripts/tmp-s42-cases.mjs
+✅ [用例1] 生成对账单，金额 = 20+30 = 50 :: status=201 amount=50
+✅ [用例1] 快照一致性：新增核销后金额不变（仍 50） :: amount=50 count=2
+✅ [用例2] 重复生成返回已存在（200 + idempotent） :: status=200 idempotent=true
+✅ [用例2] 库里只有 1 条（不重复创建） :: count=1
+✅ [用例3] 附属只看到自己的对账单（merchantId 全为 2） :: list=[2]
+✅ [用例3] 附属查别家对账单 → 404（不泄露） :: status=404
+✅ [用例3] 主体看全部（≥2 条） :: total=2
+✅ [用例4] GENERATED → CONFIRMED 成功 :: status=200
+✅ [用例4] CONFIRMED → DISPUTED → 409 SETTLEMENT_FROZEN :: status=409 reason=SETTLEMENT_FROZEN
+✅ [用例4] GENERATED → DISPUTED 成功（必填原因） :: status=200
+✅ [用例4] DISPUTED → CONFIRMED → 409 SETTLEMENT_NOT_CONFIRMABLE :: status=409 reason=SETTLEMENT_NOT_CONFIRMABLE
+✅ [用例4] 提异议缺原因 → 400 SETTLEMENT_DISPUTE_REASON_REQUIRED :: status=400 reason=SETTLEMENT_DISPUTE_REASON_REQUIRED
+✅ [用例4] DISPUTED → 重新生成 → GENERATED :: status=GENERATED regen=true
+✅ [用例5] CSV 带 UTF-8 BOM（Excel 中文不乱码） :: firstChar=0xfeff
+✅ [用例5] CSV 字段完整（券码/用户/核销时间/门店/面值/抵扣） :: contains=true
+✅ [用例5] CSV 引号转义（字段被双引号包裹） :: quoted=true
+✅ [用例6] 10000 条核销生成对账单 < 5 秒 :: 1260ms
+✅ [用例6] 总额 = 10000（DB 聚合，非应用层循环） :: amount=10000 count=10000
+===== S4.2 结果：18 通过 / 0 失败 =====
+
+======================== 合计：140 通过 / 0 失败 ========================

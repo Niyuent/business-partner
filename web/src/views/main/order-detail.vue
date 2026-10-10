@@ -51,7 +51,7 @@
           <el-table-column prop="amount" label="变动" width="90" align="right" />
           <el-table-column prop="remainingAmount" label="批次剩余" width="90" align="right" />
           <el-table-column prop="balanceAfter" label="变动后余额" width="110" align="right" />
-          <el-table-column prop="sourceTransactionId" label="来源批次" width="90" align="right" />
+          <el-table-column prop="originBatchId" label="来源批次" width="90" align="right" />
           <el-table-column prop="remark" label="备注" min-width="200" show-overflow-tooltip />
         </el-table>
       </template>

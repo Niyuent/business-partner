@@ -45,7 +45,9 @@ const A = await login('admin');
 
 const PAST = "UTC_TIMESTAMP() - INTERVAL 1 DAY";
 const FUTURE = "UTC_TIMESTAMP() + INTERVAL 1 DAY";
-const PLUS_1S = "UTC_TIMESTAMP() + INTERVAL 1 SECOND";
+// S4 收口回归稳健性：原用 +1s 作「未来批次」边界，在 Docker（cp/exec/HTTP 延迟）下会抖动
+// （延迟 >1s 就把未来批次算成已过期）。放宽到 +30s，语义仍是「未来批次不被处理」，但确定性强。
+const PLUS_FUTURE = "UTC_TIMESTAMP() + INTERVAL 30 SECOND";
 const MINUS_1S = "UTC_TIMESTAMP() - INTERVAL 1 SECOND";
 
 /** 重置用户积分数据，并直插一个账户 + 若干 EARN 批次（accountId 固定为 userId+50000，避免撞自增） */
@@ -85,9 +87,9 @@ const remain = (userId) => scalar(`SELECT GROUP_CONCAT(remainingAmount ORDER BY 
   ok('用例2', '余额 -150、生成 2 条 EXPIRE', acct(2002) === '0|150' && expireCnt(2002) === 2, `acct=${acct(2002)} expire=${expireCnt(2002)}`);
 }
 
-// ---------------------------------------------------------------- 用例 3：边界时间（+1s 不处理 / -1s 处理）
+// ---------------------------------------------------------------- 用例 3：边界时间（未来 +30s 不处理 / 过去 -1s 处理）
 {
-  // 两条批次放同一 SQL 一次插入，避免 docker exec 延迟吃掉 1 秒余量
+  // 两条批次放同一 SQL 一次插入；未来批次用 +30s 留足余量（避免 Docker 延迟抖动）
   const mk = (userId, accountId, points, expireSql) =>
     `(${userId}, ${accountId}, 'EARN', ${points}, ${points}, ${points}, ${expireSql}, 1, NULL, NULL, 's33-b', UTC_TIMESTAMP())`;
   sql(`
@@ -101,12 +103,12 @@ const remain = (userId) => scalar(`SELECT GROUP_CONCAT(remainingAmount ORDER BY 
       (52003, 2003, 40, 40, 0, 0, 0, UTC_TIMESTAMP()),
       (52004, 2004, 60, 60, 0, 0, 0, UTC_TIMESTAMP());
     INSERT INTO point_transactions (userId, accountId, type, amount, remainingAmount, balanceAfter, expireAt, merchantId, storeId, operatorId, remark, createdAt) VALUES
-      ${mk(2003, 52003, 40, PLUS_1S)},
+      ${mk(2003, 52003, 40, PLUS_FUTURE)},
       ${mk(2004, 52004, 60, MINUS_1S)};
   `);
   const r = await call('POST', 'tasks/points/expire', A, {});
   ok('用例3', '只处理 -1s 的 1 笔、过期 60', r.data?.processed === 1 && r.data?.expiredAmount === 60, `processed=${r.data?.processed} expired=${r.data?.expiredAmount}`);
-  ok('用例3', '+1s 批次未动（remaining=40）', remain(2003) === '40', `remain(2003)=${remain(2003)}`);
+  ok('用例3', '+30s（未来）批次未动（remaining=40）', remain(2003) === '40', `remain(2003)=${remain(2003)}`);
   ok('用例3', '-1s 批次已清零（balance=0）', acct(2004) === '0|60', `acct(2004)=${acct(2004)}`);
   // 清掉边界用户，避免 +1s 批次在后续用例的全局扫描里被误当成过期
   sql('DELETE FROM point_transactions WHERE userId IN (2003,2004); DELETE FROM point_accounts WHERE userId IN (2003,2004);');

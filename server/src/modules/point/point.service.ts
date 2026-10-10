@@ -336,6 +336,7 @@ export class PointService {
         relatedOrderId: r.relatedOrderId,
         relatedCouponInstanceId: r.relatedCouponInstanceId,
         sourceTransactionId: r.sourceTransactionId,
+        originBatchId: r.originBatchId,
         operatorId: r.operatorId,
         operatorName: r.operatorId ? operatorMap.get(r.operatorId) ?? null : null,
         remark: r.remark,
@@ -641,11 +642,18 @@ export class PointService {
           await sleep(20 * attempt + Math.floor(Math.random() * 20));
           continue;
         }
-        if (isUniqueViolation(e)) {
+        if (isEarnOrderUniqueViolation(e)) {
+          // **精确**命中「同一订单只送一次」的唯一索引 uniq_point_earn_order(relatedOrderId, type)
           throw BizException.conflict(
             ReasonCode.ORDER_POINTS_ALREADY_EARNED,
             `订单 #${order?.id ?? '-'}（${order?.orderNo ?? '-'}）已送过积分，不能重复送`,
           );
+        }
+        if (isUniqueViolation(e)) {
+          // 其它唯一键冲突（可能是并发创建的瞬时冲突）：重试，仍失败抛原始错误，避免误报为业务冲突
+          if (attempt === MAX_RETRY) throw e;
+          await sleep(20 * attempt + Math.floor(Math.random() * 20));
+          continue;
         }
         throw e;
       }
@@ -940,8 +948,9 @@ export class PointService {
                 merchantId: template.ownerMerchantId,
                 operatorId: user.sub,
                 relatedCouponInstanceId: instance.id,
-                // S3.4：记录「这笔扣减来自哪个 EARN 批次」，退款回退才能按方案 A 精确还原到原批次
-                sourceTransactionId: d.txnId,
+                // S4 收口：记录「这笔扣减来自哪个 EARN 批次」改用 originBatchId（不再占用 sourceTransactionId，
+                // 后者仅留给 EXPIRE 的幂等键），退款回退据此按方案 A 精确还原到原批次
+                originBatchId: d.txnId,
                 remark: dto.remark ?? `积分兑换「${template.name}」（批次 #${d.txnId} 扣 ${d.amount}）`,
               },
             });
@@ -1198,8 +1207,8 @@ export class PointService {
         status: updated.status,
       } } };
     } catch (e) {
-      // 同一商家只能有一条生效规则（唯一约束 (merchantId, status)）
-      if (isUniqueViolation(e)) {
+      // 同一商家只能有一条生效规则（唯一约束 (merchantId, status)）；**精确匹配**该索引
+      if (isPointRuleUniqueViolation(e)) {
         throw BizException.conflict(
           ReasonCode.POINT_RULE_ALREADY_ACTIVE,
           `商家 #${rule.merchantId} 已有一条生效中的积分规则，请先停用再启用`,
@@ -1297,7 +1306,7 @@ export class PointService {
       where: {
         relatedCouponInstanceId: couponInstanceId,
         type: PointTxnType.SPEND,
-        sourceTransactionId: { not: null },
+        originBatchId: { not: null },
       },
       orderBy: { id: 'asc' },
     });
@@ -1312,7 +1321,7 @@ export class PointService {
     let running = account.balance;
     for (const s of spends) {
       const take = -s.amount;
-      const sourceId = s.sourceTransactionId as number;
+      const sourceId = s.originBatchId as number;
       await tx.$executeRaw(
         Prisma.sql`UPDATE point_transactions SET remainingAmount = remainingAmount + ${take} WHERE id = ${sourceId}`,
       );
@@ -1328,7 +1337,7 @@ export class PointService {
           merchantId: s.merchantId,
           operatorId,
           relatedCouponInstanceId: couponInstanceId,
-          sourceTransactionId: sourceId,
+          originBatchId: sourceId,
           remark: `订单回退：退回批次 #${sourceId} 的 ${take} 分（保留原有效期）`,
         },
       });
@@ -1384,9 +1393,10 @@ export class PointService {
 
   /** 账户不存在则建（首次送积分时懒创建），返回带 version 的账户 */
   private async ensureAccount(tx: Prisma.TransactionClient, userId: number) {
-    const found = await tx.pointAccount.findUnique({ where: { userId } });
-    if (found) return found;
-    return tx.pointAccount.create({ data: { userId } });
+    // 原子 upsert（MySQL 映射为 INSERT ... ON DUPLICATE KEY UPDATE）：
+    // 并发下两个事务同时为「新用户」建账户时不再撞 point_accounts.userId 唯一键，
+    // 否则这笔合法操作会被误判为业务冲突（S4 收口：新用户并发录单回归用例 C2b）。
+    return tx.pointAccount.upsert({ where: { userId }, create: { userId }, update: {} });
   }
 
   /**
@@ -1618,6 +1628,26 @@ function isUniqueViolation(e: unknown): boolean {
   const code = (e as { code?: string })?.code;
   const msg = (e as Error)?.message ?? '';
   return code === 'P2002' || msg.includes('Duplicate entry');
+}
+
+/**
+ * 是否**精确**命中「同一订单只送一次」的唯一索引 `uniq_point_earn_order(relatedOrderId, type)`。
+ * 用于把 P2002 精确分类：只有这个唯一键才代表「订单已送分」，其它唯一键（如并发建账户）
+ * 不应被误报为 ORDER_POINTS_ALREADY_EARNED（S4 收口教训）。
+ */
+function isEarnOrderUniqueViolation(e: unknown): boolean {
+  if (!isUniqueViolation(e)) return false;
+  const target = (e as { meta?: { target?: unknown } })?.meta?.target;
+  const s = Array.isArray(target) ? target.join(',') : String(target ?? '');
+  return s.includes('relatedOrderId') || s.includes('uniq_point_earn_order');
+}
+
+/** 是否精确命中积分规则唯一索引 `point_rules(merchantId, status)` */
+function isPointRuleUniqueViolation(e: unknown): boolean {
+  if (!isUniqueViolation(e)) return false;
+  const target = (e as { meta?: { target?: unknown } })?.meta?.target;
+  const s = Array.isArray(target) ? target.join(',') : String(target ?? '');
+  return s.includes('point_rules') || s.includes('merchantId');
 }
 
 /**

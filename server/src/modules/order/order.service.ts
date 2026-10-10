@@ -189,6 +189,7 @@ export class OrderService {
         remainingAmount: p.remainingAmount,
         balanceAfter: p.balanceAfter,
         sourceTransactionId: p.sourceTransactionId,
+        originBatchId: p.originBatchId,
         relatedOrderId: p.relatedOrderId,
         relatedCouponInstanceId: p.relatedCouponInstanceId,
         remark: p.remark,

@@ -82,8 +82,10 @@ export interface PointTransaction {
   storeId: number | null;
   relatedOrderId: number | null;
   relatedCouponInstanceId: number | null;
-  /** EXPIRE 流水指回的原 EARN 批次 id（S3.3） */
+  /** EXPIRE 流水指回的原 EARN 批次 id（S3.3，幂等键） */
   sourceTransactionId: number | null;
+  /** SPEND/REFUND 流水关联的原 EARN 批次 id（S4 收口） */
+  originBatchId: number | null;
   operatorId: number | null;
   operatorName: string | null;
   remark: string | null;

@@ -584,7 +584,8 @@ model PointTransaction {
   expireAt                 DateTime? // 本批次有效期
   relatedOrderId           Int?          @db.UnsignedInt
   relatedCouponInstanceId  Int?          @db.UnsignedInt
-  sourceTransactionId      Int?          @db.UnsignedInt
+  sourceTransactionId      Int?          @db.UnsignedInt // 幂等键用：仅 EXPIRE 指回被清零的 EARN 批次
+  originBatchId            Int?          @db.UnsignedInt // S4 收口：SPEND/REFUND 指回原 EARN 批次
   merchantId               Int?          @db.UnsignedInt
   storeId                  Int?          @db.UnsignedInt
   operatorId               Int?          @db.UnsignedInt
@@ -600,7 +601,9 @@ model PointTransaction {
   @@index([createdAt])
   @@index([expireAt, remainingAmount])
   // 幂等键（S3.3 积分过期清零）：同一 EARN 批次只能有一条 EXPIRE 流水。
-  // sourceTransactionId 对 EARN/SPEND 等非 EXPIRE 类型恒为 NULL，MySQL 唯一索引允许多个 NULL，不冲突。
+  // sourceTransactionId **仅 EXPIRE** 使用（指回被清零的 EARN 批次），其余类型恒为 NULL
+  // （MySQL 唯一索引允许多个 NULL，不冲突）；SPEND/REFUND 与 EARN 批次的关联改用 originBatchId，
+  // 否则同一用户从同一批次二次扣分会撞唯一键（S4 收口修复）。
   @@unique([userId, sourceTransactionId, type])
   @@map("point_transactions")
 }

@@ -59,6 +59,7 @@ export interface OrderDetail {
     remainingAmount: number;
     balanceAfter: number;
     sourceTransactionId: number | null;
+    originBatchId: number | null;
     relatedOrderId: number | null;
     relatedCouponInstanceId: number | null;
     remark: string | null;

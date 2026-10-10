@@ -161,6 +161,28 @@ ok('用例1', '券实例：source=EXCHANGE、归属主体商家、券码已绑�
   inst.data.instance.source === 'EXCHANGE' && inst.data.instance.code === r.data.code && inst.data.instance.issuerMerchantId === 1,
   `source=${inst.data.instance.source} 券码=${inst.data.instance.code} 发券方=${inst.data.instance.issuerMerchantId}`);
 
+// ===== 用例1b：同一用户从「同一 EARN 批次」二次扣分（S4 收口修复回归） =====
+// 回归 S3.4 缺陷：SPEND 曾复用 sourceTransactionId 指回批次，撞唯一键 (userId, sourceTransactionId, type) → 500。
+log('');
+log('———— 用例1b：同一批次二次兑换（originBatchId 关联，无唯一键冲突） ————');
+await mkUser(1006, '骆六', '13800000006');
+await mkBatch(1006, 100, 30, 'S3.2 批次B：100分 单批次二次扣减');
+const acc1006 = await call('GET', 'point-accounts/1006', A);
+const bId = acc1006.data.batches[0]?.id;
+const tplB60 = await mkTemplate('S32 二次扣减券A(60分)', { pointsCost: 60, totalStock: 5, codes: 5 });
+const tplB30 = await mkTemplate('S32 二次扣减券B(30分)', { pointsCost: 30, totalStock: 5, codes: 5 });
+const x1 = await call('POST', 'points/exchange', A, { userId: 1006, templateId: tplB60, requestId: randomUUID() });
+const midRemain = (await call('GET', 'point-accounts/1006', A)).data.batches.find((b) => b.id === bId)?.remainingAmount;
+const x2 = await call('POST', 'points/exchange', A, { userId: 1006, templateId: tplB30, requestId: randomUUID() });
+const endRemain = (await call('GET', 'point-accounts/1006', A)).data.batches.find((b) => b.id === bId)?.remainingAmount ?? 0;
+ok('用例1b', '第一次兑换 60 → 批次剩 40，无 500', ok200(x1.status) && midRemain === 40, `HTTP=${x1.status} 批次#${bId} 剩 ${midRemain}`);
+ok('用例1b', '第二次兑换 30（同一批次）→ 批次剩 10，无 500', ok200(x2.status) && endRemain === 10, `HTTP=${x2.status} 批次#${bId} 剩 ${endRemain}`);
+const sp1b = await call('GET', 'point-transactions?userId=1006&type=SPEND&pageSize=10', A);
+ok('用例1b', '生成 2 条 SPEND，originBatchId 均指向批次 B', sp1b.data.total === 2 && sp1b.data.list.every((x) => x.originBatchId === bId),
+  `SPEND=${sp1b.data.total} origin=${sp1b.data.list.map((x) => x.originBatchId).join(',')} 批次#${bId}`);
+ok('用例1b', 'SPEND 的 sourceTransactionId 为 NULL（唯一键仅约束 EXPIRE）', sp1b.data.list.every((x) => x.sourceTransactionId === null),
+  `source=${sp1b.data.list.map((x) => x.sourceTransactionId).join(',')}`);
+
 // ===================== 用例 2：并发兑换（不同 requestId） =====================
 log('');
 log('———— 用例2：并发兑换同一模板（用户余额刚好 100） ————');

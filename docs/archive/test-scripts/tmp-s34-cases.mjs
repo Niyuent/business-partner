@@ -72,9 +72,9 @@ function seedOrderWithCoupon(orderNo, userId, accountId, merchantId, couponId, t
   // 券实例（USED，模拟已核销）
   sql(`INSERT INTO coupon_instances (id, userId, templateId, code, issuerMerchantId, source, pointsCost, status, obtainedAt, expireAt, usedAt, createdAt, updatedAt)
        VALUES (${couponId}, ${userId}, ${templateId}, 'S34CODE${couponId}', ${merchantId}, 'EXCHANGE', ${pointsCost}, 'USED', UTC_TIMESTAMP(), ${FUTURE}, UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP());`);
-  // SPEND 流水（每条带 sourceTransactionId 指回 EARN 批次）
+  // SPEND 流水（每条带 originBatchId 指回 EARN 批次 —— S4 收口：SPEND 的批次关联改用 originBatchId）
   const spendRows = spends.map((s) => `(${userId},${accountId},'SPEND',${-s.amount},0,0,${couponId},${s.sourceTxnId},${merchantId},NULL,NULL,'s34-spend',UTC_TIMESTAMP())`).join(',');
-  sql(`INSERT INTO point_transactions (userId, accountId, type, amount, remainingAmount, balanceAfter, relatedCouponInstanceId, sourceTransactionId, merchantId, storeId, operatorId, remark, createdAt) VALUES ${spendRows};`);
+  sql(`INSERT INTO point_transactions (userId, accountId, type, amount, remainingAmount, balanceAfter, relatedCouponInstanceId, originBatchId, merchantId, storeId, operatorId, remark, createdAt) VALUES ${spendRows};`);
   // 订单（异常）
   sql(`INSERT INTO orders (orderNo, userId, merchantId, storeId, orderType, totalAmount, discountAmount, payAmount, couponInstanceId, pointsEarned, status, abnormalType, abnormalRemark, source, consumeTime, createdAt, updatedAt)
        VALUES ('${orderNo}', ${userId}, ${merchantId}, NULL, 'CONSUME', 100, 0, 100, ${couponId}, 0, '${orderStatus}', 'STORE_DISPUTE', '门店争议异常', 'IMPORT', UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP());`);
@@ -85,7 +85,7 @@ function remain(txnId) { return Number(scalar(`SELECT remainingAmount FROM point
 function orderRow(orderNo) { return scalar(`SELECT CONCAT(status,'|',IFNULL(couponInstanceId,'NULL'),'|',IFNULL(handleResult,'NULL'),'|',IFNULL(handledBy,'NULL')) FROM orders WHERE orderNo='${orderNo}'`); }
 function couponStatus(couponId) { return scalar(`SELECT status FROM coupon_instances WHERE id=${couponId}`); }
 function refundRows(userId) { return Number(scalar(`SELECT COUNT(*) FROM point_transactions WHERE userId=${userId} AND type='REFUND'`)); }
-function refundSources(userId) { return scalar(`SELECT GROUP_CONCAT(sourceTransactionId ORDER BY id) FROM point_transactions WHERE userId=${userId} AND type='REFUND'`); }
+function refundSources(userId) { return scalar(`SELECT GROUP_CONCAT(originBatchId ORDER BY id) FROM point_transactions WHERE userId=${userId} AND type='REFUND'`); }
 
 // ---------------------------------------------------------------- 用例 1：订单取消完整回退
 {
