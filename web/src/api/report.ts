@@ -1,6 +1,39 @@
 import request from '@/utils/request';
 import { http } from '@/utils/request';
 
+// ---------------------------------------------------- 工作台（dashboard）类型
+export interface DashboardCard {
+  key: string;
+  label: string;
+  value: number;
+  unit: string;
+  trend: number;
+}
+export interface DashboardTodo {
+  pendingMerchants: number;
+  abnormalOrders: number;
+  unreadNotifications: number;
+}
+export interface DashboardStats {
+  cards: DashboardCard[];
+  todo: DashboardTodo;
+}
+export interface DashboardTrend {
+  dates: string[];
+  orders: number[];
+  redemptions: number[];
+  exchanges: number[];
+}
+export interface DashboardDistribution {
+  couponTypes: Array<{ type: string; count: number }>;
+  pointSources: Array<{ type: string; value: number }>;
+}
+export interface DashboardTopMerchant {
+  merchantId: number;
+  name: string;
+  amount: number;
+}
+
 /** 报表通用查询参数（时间范围 + 商家筛选；keyword 在前端做客户端过滤，不进后端） */
 export interface ReportQuery {
   from?: string;
@@ -98,5 +131,18 @@ export const reportApi = {
     a.download = `report-${key}-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  },
+  // ---------------------------------------------------- 工作台（dashboard）
+  dashboardStats() {
+    return http<DashboardStats>({ url: '/dashboard/stats', method: 'GET' });
+  },
+  dashboardTrend(days = 7) {
+    return http<DashboardTrend>({ url: '/dashboard/trend', method: 'GET', params: { days } });
+  },
+  dashboardDistribution() {
+    return http<DashboardDistribution>({ url: '/dashboard/distribution', method: 'GET' });
+  },
+  dashboardTopMerchants() {
+    return http<DashboardTopMerchant[]>({ url: '/dashboard/top-merchants', method: 'GET' });
   },
 };

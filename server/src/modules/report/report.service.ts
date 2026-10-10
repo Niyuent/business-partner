@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { MerchantType, Prisma } from '@prisma/client';
+import { MerchantType, PointTxnType, Prisma } from '@prisma/client';
 import { toCsv } from '../../common/utils/csv.util';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { JwtPayload } from '../auth/jwt-payload';
@@ -470,11 +470,26 @@ export class ReportService {
     const win = (w: Record<string, unknown>, from: Date, to: Date) => ({ ...w, createdAt: { gte: from, lt: to } });
     const redeemWin = (from: Date, to: Date) => ({ ...redeemWhere, redeemedAt: { gte: from, lt: to } });
 
+    const ptAgg = (type: PointTxnType, from: Date, to: Date) =>
+      this.prisma.pointTransaction.aggregate({
+        where: {
+          ...(merchantId ? { merchantId } : {}),
+          ...(storeId ? { storeId } : {}),
+          type,
+          createdAt: { gte: from, lt: to },
+        },
+        _sum: { amount: true },
+      });
+    const sumPt = async (type: PointTxnType, from: Date, to: Date) =>
+      Math.abs(Number((await ptAgg(type, from, to))._sum.amount ?? 0));
+
     const [
       ordersToday, ordersYest,
       redeemToday, redeemYest,
       exchangeToday, exchangeYest,
       couponToday, couponYest,
+      pointIssuedToday, pointIssuedYest,
+      pointConsumedToday, pointConsumedYest,
     ] = await Promise.all([
       this.prisma.order.count({ where: win(orderWhere, today, tomorrow) }),
       this.prisma.order.count({ where: win(orderWhere, yesterday, today) }),
@@ -484,6 +499,10 @@ export class ReportService {
       this.prisma.exchangeRecord.count({ where: { createdAt: { gte: yesterday, lt: today } } }),
       this.prisma.couponInstance.count({ where: win(couponWhere, today, tomorrow) }),
       this.prisma.couponInstance.count({ where: win(couponWhere, yesterday, today) }),
+      sumPt('EARN', today, tomorrow),
+      sumPt('EARN', yesterday, today),
+      sumPt('SPEND', today, tomorrow),
+      sumPt('SPEND', yesterday, today),
     ]);
 
     /** 环比：昨日为 0 时给 100%（从无到有），否则按百分比 */
@@ -495,6 +514,8 @@ export class ReportService {
       { key: 'redemptions', label: '今日核销', value: redeemToday, unit: '笔', trend: trend(redeemToday, redeemYest) },
       { key: 'exchanges', label: '今日兑换', value: exchangeToday, unit: '笔', trend: trend(exchangeToday, exchangeYest) },
       { key: 'coupons', label: '今日发券', value: couponToday, unit: '张', trend: trend(couponToday, couponYest) },
+      { key: 'pointIssued', label: '今日积分发行', value: pointIssuedToday, unit: '分', trend: trend(pointIssuedToday, pointIssuedYest) },
+      { key: 'pointConsumed', label: '今日积分消耗', value: pointConsumedToday, unit: '分', trend: trend(pointConsumedToday, pointConsumedYest) },
     ];
   }
 
@@ -581,5 +602,65 @@ export class ReportService {
       redemptions: fill(redeemRows),
       exchanges: fill(exchangeRows),
     };
+  }
+
+  /** 分布：券类型分布（按实例数） + 积分来源分布（按变动量绝对值），隔离到角色视角 */
+  async distribution(user: JwtPayload) {
+    const { merchantId, storeId } = await this.scope(user);
+    const couponWhere: Prisma.CouponInstanceWhereInput = {
+      ...(merchantId ? { issuerMerchantId: merchantId } : {}),
+    };
+    const ptWhere: Prisma.PointTransactionWhereInput = {
+      ...(merchantId ? { merchantId } : {}),
+      ...(storeId ? { storeId } : {}),
+    };
+    const [couponRows, ptRows] = await Promise.all([
+      // CouponInstance 无 type 字段，券类型在关联模板的 couponType 上，故按 templateId 分组后映射
+      this.prisma.couponInstance.groupBy({ by: ['templateId'], where: couponWhere, _count: { _all: true } }),
+      this.prisma.pointTransaction.groupBy({ by: ['type'], where: ptWhere, _sum: { amount: true } }),
+    ]);
+    const templateIds = couponRows.map((r) => r.templateId);
+    const templates = templateIds.length
+      ? await this.prisma.couponTemplate.findMany({
+          where: { id: { in: templateIds } },
+          select: { id: true, ownerType: true },
+        })
+      : [];
+    // 「券类型分布」口径 = 券归属类型（主体券 MAIN_COUPON / 附属商家券 SUB_COUPON），
+    // 与 S4.3.1 coupon-summary 同源（coupon_instances + coupon_templates + 同一 scope 隔离），仅聚合维度不同。
+    const ownerTypeOf = new Map(templates.map((t) => [t.id, t.ownerType]));
+    // 按 ownerType 聚合（同一归属类型的多个模板合并为一条），避免饼图出现多个「主体券」切片
+    const couponCount = new Map<string, number>();
+    for (const r of couponRows) {
+      const ot = ownerTypeOf.get(r.templateId) ?? 'UNKNOWN';
+      couponCount.set(ot, (couponCount.get(ot) ?? 0) + r._count._all);
+    }
+    const couponTypes = Array.from(couponCount.entries()).map(([type, count]) => ({ type, count }));
+    const pointSources = ptRows.map((r) => ({
+      type: r.type,
+      value: Math.abs(Number(r._sum.amount ?? 0)),
+    }));
+    return { couponTypes, pointSources };
+  }
+
+  /** Top5 商家：按订单交易额（payAmount）聚合，仅平台/主体可见；附属/店员返回空 */
+  async topMerchants(user: JwtPayload): Promise<Array<{ merchantId: number; name: string; amount: number }>> {
+    const { merchantId } = await this.scope(user);
+    if (merchantId) return []; // 非平台/主体视角，「全平台 Top5」无意义
+    const rows = await this.prisma.$queryRaw<
+      Array<{ merchantId: number; name: string; amount: unknown }>
+    >(
+      Prisma.sql`SELECT o.merchantId, m.name, SUM(o.payAmount) AS amount
+                 FROM orders o JOIN merchants m ON m.id = o.merchantId
+                 GROUP BY o.merchantId, m.name
+                 ORDER BY amount DESC
+                 LIMIT 5`,
+    );
+    // mysql 驱动对 SUM(DECIMAL) / 关联 merchantId 可能返回 BigInt，响应前统一转 number，否则 JSON 序列化报错
+    return rows.map((r) => ({
+      merchantId: Number(r.merchantId),
+      name: String(r.name),
+      amount: Number(r.amount),
+    }));
   }
 }

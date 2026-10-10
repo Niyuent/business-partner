@@ -38,4 +38,18 @@ export class DashboardController {
   todo(@CurrentUser() user: JwtPayload) {
     return this.reports.todo(user);
   }
+
+  @Get('distribution')
+  @Permissions('dashboard:view')
+  @ApiOperation({ summary: '分布：券类型分布 + 积分来源分布（隔离到角色视角）' })
+  distribution(@CurrentUser() user: JwtPayload) {
+    return this.reports.distribution(user);
+  }
+
+  @Get('top-merchants')
+  @Permissions('dashboard:view')
+  @ApiOperation({ summary: '交易额 Top5 商家（仅平台/主体可见，附属/店员返回空）' })
+  topMerchants(@CurrentUser() user: JwtPayload) {
+    return this.reports.topMerchants(user);
+  }
 }

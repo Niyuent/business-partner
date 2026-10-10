@@ -9,8 +9,8 @@ const P = (stage: string) => () => import('@/views/common/placeholder.vue');
 export const dashboardRoute: RouteRecordRaw = {
   path: '/dashboard',
   name: 'Dashboard',
-  component: () => import('@/views/dashboard/index.vue'),
-  meta: { title: '工作台', icon: 'Odometer' },
+  component: () => import('@/views/main/dashboard.vue'),
+  meta: { title: '工作台', icon: 'Odometer', permission: 'dashboard:view' },
 };
 
 /**

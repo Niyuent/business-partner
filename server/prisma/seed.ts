@@ -396,9 +396,8 @@ async function main() {
     'point:earn',
     'point:exchange',
     'point:exchange:view',
-    // S4.3.2.1：门店店员可查看（隔离到本店）并导出报表
+    // S4.3.2.1 / P0：门店店员可查看（隔离到本店）报表，但**不给导出**权限（report:export 仅主体/附属管理员持有）
     'report:view',
-    'report:export',
   ];
 
   const roleDefs: Array<[number, string, string, RoleScope, string[]]> = [
