@@ -1,36 +1,48 @@
-node_modules/
-**/node_modules/
-dist/
-**/dist/
-build/
-
-# 环境变量（含各 workspace）
-.env
-**/.env
-.env.local
-.env.*.local
-server/.env
-web/.env
-# 环境变量备份 / 任意备份文件：曾误提交 .env.bak（含真实库密码），一律排除
-.env.bak
-*.bak
-!.env.example
-!**/.env.example
-
-*.log
-npm-debug.log*
-yarn-error.log*
-
-.DS_Store
-.idea/
-.vscode/
-!.vscode/extensions.json
-
-coverage/
-.temp/
-.cache/
-*.tsbuildinfo
-
-# 运行时上传目录（营业执照等），属运行时数据不入库；目录本身用 .gitkeep 保留
-uploads/*
-!uploads/.gitkeep
+# =============================================================================
+# ⚠️ 本仓库已按所有者要求「上传全部文件」，原忽略规则**全部停用**。
+#
+# 因此以下内容已进入 git 历史（公开仓库，且历史不可撤销）：
+#   1. .env / server/.env —— 含真实 MYSQL_ROOT_PASSWORD、JWT_SECRET、API_TOKEN、DATABASE_URL
+#   2. node_modules/     —— 约 452MB / 3.7 万文件（会显著拖慢 clone/CI）
+#   3. server/dist/ web/dist/ —— 构建产物
+#   4. uploads/          —— 运行时上传的图片（营业执照等）
+#   5. server-build.log  —— 构建日志
+#
+# 安全提示：请尽快**轮换**上述口令与密钥（改完 GitHub 里的历史也删不掉），
+#          并考虑把仓库改为 Private。
+#
+# 如需恢复忽略，取消下方对应行的注释即可：
+# -----------------------------------------------------------------------------
+# node_modules/
+# **/node_modules/
+# dist/
+# **/dist/
+# build/
+#
+# .env
+# **/.env
+# .env.local
+# .env.*.local
+# server/.env
+# web/.env
+#
+# .env.bak
+# *.bak
+# !.env.example
+# !**/.env.example
+#
+# *.log
+# npm-debug.log*
+# yarn-error.log*
+#
+# .DS_Store
+# .idea/
+# .vscode/
+#
+# coverage/
+# .temp/
+# .cache/
+# *.tsbuildinfo
+#
+# uploads/*
+# !uploads/.gitkeep

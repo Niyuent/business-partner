@@ -1,0 +1,150 @@
+import { CouponInstanceStatus, CouponSource } from '@prisma/client';
+import { PrismaService } from '../../common/prisma/prisma.service';
+import { AuditService } from '../audit-log/audit.service';
+import { AuthorizationService } from '../authorization/authorization.service';
+import { JwtPayload } from '../auth/jwt-payload';
+import { CouponTemplateService } from './coupon-template.service';
+import { FreezeInstanceDto, IssueCouponDto, QueryInstancesDto } from './dto/coupon-instance.dto';
+export interface CouponInstanceView {
+    id: number;
+    userId: number;
+    userName: string | null;
+    userPhone: string | null;
+    templateId: number;
+    templateName: string | null;
+    code: string | null;
+    issuerMerchantId: number | null;
+    issuerMerchantName: string | null;
+    source: CouponSource;
+    pointsCost: number;
+    status: CouponInstanceStatus;
+    obtainedAt: Date;
+    expireAt: Date;
+    usedAt: Date | null;
+    createdAt: Date;
+}
+export declare class CouponInstanceService {
+    private readonly prisma;
+    private readonly audit;
+    private readonly templates;
+    private readonly authorization;
+    private readonly logger;
+    constructor(prisma: PrismaService, audit: AuditService, templates: CouponTemplateService, authorization: AuthorizationService);
+    issue(dto: IssueCouponDto, user: JwtPayload, ip?: string, ua?: string): Promise<{
+        issued: {
+            issuerMerchantName: string;
+            id: number;
+            userId: number;
+            userName: string | null;
+            userPhone: string | null;
+            templateId: number;
+            templateName: string | null;
+            code: string | null;
+            issuerMerchantId: number | null;
+            source: CouponSource;
+            pointsCost: number;
+            status: CouponInstanceStatus;
+            obtainedAt: Date;
+            expireAt: Date;
+            usedAt: Date | null;
+            createdAt: Date;
+        }[];
+        quantity: number;
+        expireAt: Date;
+    }>;
+    freeze(id: number, dto: FreezeInstanceDto, user: JwtPayload, ip?: string, ua?: string): Promise<{
+        instance: {
+            issuerMerchantName: string;
+            id: number;
+            userId: number;
+            userName: string | null;
+            userPhone: string | null;
+            templateId: number;
+            templateName: string | null;
+            code: string | null;
+            issuerMerchantId: number | null;
+            source: CouponSource;
+            pointsCost: number;
+            status: CouponInstanceStatus;
+            obtainedAt: Date;
+            expireAt: Date;
+            usedAt: Date | null;
+            createdAt: Date;
+        };
+    }>;
+    list(query: QueryInstancesDto, user: JwtPayload): Promise<{
+        list: {
+            issuerMerchantName: string;
+            id: number;
+            userId: number;
+            userName: string | null;
+            userPhone: string | null;
+            templateId: number;
+            templateName: string | null;
+            code: string | null;
+            issuerMerchantId: number | null;
+            source: CouponSource;
+            pointsCost: number;
+            status: CouponInstanceStatus;
+            obtainedAt: Date;
+            expireAt: Date;
+            usedAt: Date | null;
+            createdAt: Date;
+        }[];
+        total: number;
+        page: number;
+        pageSize: number;
+    }>;
+    detail(id: number, user: JwtPayload): Promise<{
+        instance: {
+            faceValue: number;
+            thresholdAmount: number;
+            applyScope: import(".prisma/client").$Enums.ApplyScope;
+            stores: {
+                id: number;
+                name: string;
+            }[];
+            redemptions: {
+                id: number;
+                code: string;
+                status: import(".prisma/client").$Enums.RedemptionStatus;
+                channel: import(".prisma/client").$Enums.RedemptionChannel;
+                storeId: number;
+                storeName: string;
+                operatorId: number;
+                operatorName: string;
+                orderId: number;
+                orderNo: string;
+                faceValue: number;
+                discountAmount: number;
+                reverseReason: string;
+                reversedAt: Date;
+                redeemedAt: Date;
+            }[];
+            issuerMerchantName: string;
+            id: number;
+            userId: number;
+            userName: string | null;
+            userPhone: string | null;
+            templateId: number;
+            templateName: string | null;
+            code: string | null;
+            issuerMerchantId: number | null;
+            source: CouponSource;
+            pointsCost: number;
+            status: CouponInstanceStatus;
+            obtainedAt: Date;
+            expireAt: Date;
+            usedAt: Date | null;
+            createdAt: Date;
+        };
+    }>;
+    private resolveIssuerMerchant;
+    private resolveUser;
+    private assertIssuable;
+    private computeExpireAt;
+    private visibleWhere;
+    private assertInstanceVisible;
+    private withIssuerNames;
+    private toView;
+}

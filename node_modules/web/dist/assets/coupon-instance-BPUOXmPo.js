@@ -1,0 +1,1 @@
+import{I as t}from"./index-CET_rpto.js";const s={issue(e){return t({url:"/coupon-instances/issue",method:"POST",data:e})},list(e={}){return t({url:"/coupon-instances",method:"GET",params:e})},detail(e){return t({url:`/coupon-instances/${e}`,method:"GET"})},freeze(e,n,o){return t({url:`/coupon-instances/${e}/freeze`,method:"PATCH",data:{frozen:n,reason:o}})}};export{s as c};
