@@ -22,6 +22,7 @@ const SCRIPTS = [
   ['tmp-s42-cases', 'S4.2 对账账单'],
   ['tmp-s51-cases', 'S5.1 C 端用户鉴权'],
   ['tmp-s52-cases', 'S5.2 用户管理'],
+  ['tmp-s53-cases', 'S5.3 门店变更申请'],
 ];
 
 const summaryOf = (out) =>

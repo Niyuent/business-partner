@@ -186,8 +186,8 @@ export const mainRoutes: RouteRecordRaw[] = [
   {
     path: '/main/store-change-requests',
     name: 'StoreChangeRequests',
-    component: P('S5'),
-    meta: { title: '门店变更审核', icon: 'EditPen', permission: 'store:manage', stage: 'S5' },
+    component: () => import('@/views/main/store-change-requests.vue'),
+    meta: { title: '门店变更审核', icon: 'EditPen', permission: 'store:change:review', stage: 'S5.3' },
   },
   {
     path: '/main/notifications',
@@ -249,8 +249,8 @@ export const subRoutes: RouteRecordRaw[] = [
   {
     path: '/sub/store',
     name: 'SubStore',
-    component: P('S5'),
-    meta: { title: '门店信息', icon: 'Shop', permission: 'store:view', stage: 'S5' },
+    component: () => import('@/views/sub/store.vue'),
+    meta: { title: '门店信息', icon: 'Shop', permission: 'store:view', stage: 'S5.3' },
   },
   {
     path: '/sub/notifications',

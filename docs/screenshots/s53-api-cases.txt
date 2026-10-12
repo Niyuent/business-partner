@@ -1,0 +1,42 @@
+S5.3 门店变更申请 · 验收用例（HTTP 实测）
+生成时间: 2026-10-12
+脚本: docs/archive/test-scripts/tmp-s53-cases.mjs
+命令: node docs/archive/test-scripts/tmp-s53-cases.mjs
+环境: （sub01 商户=2 本店=101 别家门店=201）；结尾清理申请并通过 UNHEX 还原门店中文名
+
+———— 失败 / 越权 / 校验 ————
+✅ [F1] 夹带禁止字段 code → 400 STORE_CHANGE_FIELD_FORBIDDEN :: HTTP=400 STORE_CHANGE_FIELD_FORBIDDEN
+✅ [F2] 无有效变更 → 400 STORE_CHANGE_NO_DIFF :: HTTP=400 STORE_CHANGE_NO_DIFF
+✅ [F3] 电话格式非法 → 400 :: HTTP=400
+✅ [F4] 附属提交别家门店 → 403 STORE_NOT_OWNED :: HTTP=403 STORE_NOT_OWNED
+✅ [F5] 附属查看别家门店申请 → 403 STORE_NOT_OWNED :: HTTP=403 STORE_NOT_OWNED
+✅ [F6] 附属访问审核列表 → 403 PERMISSION_DENIED :: HTTP=403 PERMISSION_DENIED
+✅ [F7] 审核不存在的申请 → 404 :: HTTP=404 RESOURCE_NOT_FOUND
+
+———— 提交 / 并发 ————
+✅ [S1] 附属提交本店变更 → PENDING + changes 存 {old,new} :: HTTP=201 id=25 nameChange={"new":"S101中心店-989969","old":"S-101 中心店"}
+✅ [F8] 同门店二次提交（已有 PENDING）→ 409 STORE_CHANGE_PENDING_EXISTS :: HTTP=409 STORE_CHANGE_PENDING_EXISTS
+✅ [S2] 主体审核列表可见该申请 :: HTTP=200 total=1 found=true
+✅ [S3] 审核详情返回变更前后对比 + 门店信息 :: HTTP=200 store=S-101 中心店
+✅ [F9] 附属审核 → 403 PERMISSION_DENIED :: HTTP=403 PERMISSION_DENIED
+✅ [F10] 驳回未填原因 → 400 STORE_CHANGE_REASON_REQUIRED :: HTTP=400 STORE_CHANGE_REASON_REQUIRED
+✅ [S4] 附属作废本店 PENDING 申请 → 200 :: HTTP=201
+✅ [S5] 作废后本店申请列表为空（作废生效） :: 剩余=0
+
+———— 审核通过（事务生效） ————
+✅ [S6] 作废后可重新提交 → 201 PENDING :: HTTP=201 id=26
+✅ [S7] 通过 → APPROVED 且 stores 同事务更新（电话落库 + 门店名经 API 校验） :: HTTP=201 status=APPROVED phone=13800001111 storeName(API)=S101中心店-989969
+✅ [S8] 审核动作写审计 :: audit 1→2
+✅ [F11] 已审核申请再审 → 409 STORE_CHANGE_NOT_PENDING :: HTTP=409 STORE_CHANGE_NOT_PENDING
+✅ [F12] 作废已审核申请 → 409 STORE_CHANGE_NOT_PENDING :: HTTP=409 STORE_CHANGE_NOT_PENDING
+
+———— 驳回 ————
+✅ [S9] 驳回 → REJECTED + 原因落库且 stores 不变 :: HTTP=201 status=REJECTED remark=营业时间需与商场一致
+✅ [S10] 用例后门店名称已完整还原（HEX 与原始一致） :: hex=532D31303120E4B8ADE5BF83E5BA97
+
+===== S5.3 结果：22 通过 / 0 失败 =====
+
+说明:
+- 覆盖：提交/列表/详情/通过/驳回/作废 + 越权(403)/并发(409)/状态机(409)/校验(400)。
+- ⚠️ 编码教训：Windows 控制台会把 mysql 输出的中文转成 '?'，脚本已改为 **HEX/UNHEX 读写 + 中文断言走 API JSON**，避免回写污染数据。
+- 前端截图（/sub/store、/main/store-change-requests）+ DevTools Network 由人工验收补。

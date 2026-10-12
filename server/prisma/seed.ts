@@ -337,6 +337,9 @@ async function main() {
     ['settlement:generate', '生成对账单', 'settlement'],
     // S5.2 用户管理（追加在末尾，避免打乱既有权限码的固定主键 1..N）
     ['user:edit', '编辑用户', 'user'],
+    // S5.3 门店变更申请
+    ['store:change:submit', '提交门店变更申请', 'store'],
+    ['store:change:review', '审核门店变更申请', 'store'],
   ];
 
   const permissionSeeds: Array<{ id: number; code: string; name: string; group: string }> = [];
@@ -353,6 +356,8 @@ async function main() {
     'dashboard:view',
     'store:view',
     'store:change-request',
+    // S5.3：附属可提交本店变更申请（审核权 store:change:review 归主体/平台）
+    'store:change:submit',
     'coupon:view',
     // S3.1：门店消费录单送积分（店员同样需要），查看积分流水与规则
     'point:earn',

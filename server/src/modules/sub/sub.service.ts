@@ -52,7 +52,11 @@ export class SubService {
         city: true,
         district: true,
         address: true,
+        // S5.3：门店变更表单回填需要经纬度 / 营业时间 / Logo
+        lng: true,
+        lat: true,
         businessHours: true,
+        logo: true,
         status: true,
       },
     });

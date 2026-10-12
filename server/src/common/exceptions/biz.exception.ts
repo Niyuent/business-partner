@@ -171,6 +171,16 @@ export const ReasonCode = {
   SETTLEMENT_ALREADY_EXISTS: 'SETTLEMENT_ALREADY_EXISTS',
   // S5.2 用户管理：手机号被占用（手机号全局唯一）
   USER_PHONE_EXISTS: 'USER_PHONE_EXISTS',
+  // S5.3 门店变更：同一门店已存在待审核申请
+  STORE_CHANGE_PENDING_EXISTS: 'STORE_CHANGE_PENDING_EXISTS',
+  // S5.3 门店变更：申请非 PENDING（已审核/已作废，不可再操作）
+  STORE_CHANGE_NOT_PENDING: 'STORE_CHANGE_NOT_PENDING',
+  // S5.3 门店变更：夹带禁止变更字段（code / merchantId / status 等）
+  STORE_CHANGE_FIELD_FORBIDDEN: 'STORE_CHANGE_FIELD_FORBIDDEN',
+  // S5.3 门店变更：提交内容与当前值完全一致（无有效变更）
+  STORE_CHANGE_NO_DIFF: 'STORE_CHANGE_NO_DIFF',
+  // S5.3 门店变更：驳回未填写原因
+  STORE_CHANGE_REASON_REQUIRED: 'STORE_CHANGE_REASON_REQUIRED',
   // CONFIRMED 后冻结，不可再 confirm/dispute
   SETTLEMENT_FROZEN: 'SETTLEMENT_FROZEN',
   // 非 GENERATED 状态不能 confirm/dispute（如 DISPUTED 必须先重新生成）

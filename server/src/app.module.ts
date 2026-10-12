@@ -22,6 +22,7 @@ import { SettlementModule } from './modules/settlement/settlement.module';
 import { ReportModule } from './modules/report/report.module';
 import { H5Module } from './modules/h5/h5.module';
 import { UserModule } from './modules/user/user.module';
+import { StoreModule } from './modules/store/store.module';
 
 /**
  * 全站默认鉴权策略：**拒绝未声明的**。
@@ -65,6 +66,8 @@ import { UserModule } from './modules/user/user.module';
     H5Module,
     // S5.2：用户管理（主体后台，附属/店员按「本商家/门店消费过的」隔离）
     UserModule,
+    // S5.3：门店变更申请（附属提交 → 主体审核 → 生效，白名单字段）
+    StoreModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

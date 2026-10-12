@@ -60,9 +60,9 @@ docs/                 00-AI-Context(本文件) · 01~06 · archive/test-scripts/
 
 ## 6. 当前进度 & 下一步
 
-- **当前**：**S5 进行中**。S5.1 C 端用户鉴权 ✅、S5.2 用户管理 ✅；全量回归 `npm run regression` = **204/0**（S1/S2/S3.1–S3.4/S4.1/S4.2/S5.1/S5.2）。
-- **回归入口**：`npm run regression`（seed 一次 → 顺序跑全部阶段脚本，失败即停；含 S5.1/S5.2 用例）。
-- **下一步**：S5.3 门店变更申请 → S5.4 通知 + 附属侧补齐（每批停下验收）。
+- **当前**：**S5 进行中**。S5.1 ✅ / S5.2 ✅ / S5.3 ✅；回归入口已含 S5.3（S1–S5.3；此前 204/0 + S5.3 22 条）。
+- **回归入口**：`npm run regression`（seed 一次 → 顺序跑全部阶段脚本，失败即停；含 S5.1/S5.2/S5.3 用例）。
+- **下一步**：S5.4 通知落地（站内信 / SSE / 通知中心）+ 附属侧页面补齐（每批停下验收）。
 
 ## 7. 关键约定（必须遵守）
 
@@ -113,7 +113,7 @@ node docs/archive/test-scripts/tmp-s32-cases.mjs   # …… 依次
 S5 范围（4 批，每批停下验收）：
 - **S5.1 C 端用户鉴权** ✅（微信 code2session + C 端 JWT + 双向隔离 + P0 限流/模拟安全）。
 - **S5.2 用户管理（主体后台）** ✅（`/main/users` 列表 / 详情 / 启停 / 绑手机号；附属/店员按「本店消费过」隔离）。
-- **S5.3 门店变更申请** ⬜（附属提交 → 主体审核 → 生效）。
+- **S5.3 门店变更申请** ✅（`/sub/store` 提交 → `/main/store-change-requests` 审核 → 同事务生效；白名单字段 + 同店 PENDING 唯一 + 驳回必填原因 + 越权 403/状态机 409）。
 - **S5.4 通知 + 附属侧补齐** ⬜（站内信 / SSE / 通知中心；`/sub/orders|redemptions|purchases|settlements|notifications`）。
 
 **S5 起点必做（S4 收口遗留）**
@@ -129,3 +129,19 @@ S5 范围（4 批，每批停下验收）：
 - 待补：S4.3 报表回归脚本（S5.1/S5.2 已并入 `npm run regression`；S1/S2 已补）。
 - 前端 S4.3.2.1 / S4.3.3 的浏览器视觉截图 + Network 截图（人工验收补）。
 - 迁移注意：本项目迁移文件与 DB 曾出现 drift，改 schema 优先写迁移而非 `migrate dev`。
+
+## 12. S5.3 前置答复（3 个遗漏）
+
+1. **手机号绑定**
+   - **S5.2 已加**：`POST /users/:id/bind-phone`（主体后台，权限 `user:edit`；手机号全局唯一，重复 → 409 `USER_PHONE_EXISTS`，写审计 `user:bind-phone`）。前端在 `/main/users` 列表与详情均有「绑手机号」入口。
+   - **录单匹配路径**：当前**录单以 `userId` 为准**（`point:earn` 传 userId），**不存在「手机号匹配不到用户」的场景** —— 因为录单根本不按手机号匹配。
+   - **待认领池**：**无**（未实现）。「按手机号录单 → 未匹配进待认领池 → 用户绑定/注册后按 `users.phone` 自动认领」依赖新的录单入口，**S5.4 补上**（先加「按手机号录单」再引入 `pending_records` 池）。
+
+2. **C 端 user token 有效期**
+   - 时长：**2h**（与环境变量 `JWT_EXPIRES_IN` 一致，与 admin token 同值）。
+   - refresh：**无**。过期后 `h5Request` 拦截 401 → 清 `user_token` → 跳 `/h5/login`，用户重新 `wx.login`（微信**静默重新登录**，成本极低）。
+   - 与 admin token 的区别：payload 不同（C 端 `kind:'USER' + userId`；后台 `sub`=adminUser.id 无 `kind`）、可访问范围不同（C 端仅 `/h5/**`；后台为 `/api/v1/**` 其余）、存储 key 不同（`user_token` vs `admin_token`）、签发端点不同（`/auth/user-login` vs `/auth/login`）。
+
+3. **`npm run regression` 入口**
+   - **已加入** S5.1 / S5.2 脚本（`scripts/regression.mjs`：seed 一次 → 顺序跑 S1/S2/S3.1–S3.4/S4.1/S4.2/S5.1/S5.2，任一失败即停）。
+   - 最近一次全量回归 = **204/0**（23+12+32+39+15+20+16+18+14+15）。S5.3 完成后脚本并入，回归总数将增至 204 + S5.3 用例数。
