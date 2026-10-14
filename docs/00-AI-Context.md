@@ -28,7 +28,7 @@
 ```
 server/src/modules/   auth · merchant · store · authorization · audit-log
                       coupon · point · order · purchase · settlement
-                      report · dashboard(在 report 模块) · notification · sse · upload
+                      report · dashboard(在 report 模块) · notification(S5.4-A 站内信后端) · sse · upload
 server/prisma/        schema.prisma · migrations/ · seed.ts（固定主键，重跑稳定）
 web/src/api/          各模块 API 封装（真实 /api/v1/*，无 mock）
 web/src/views/main/   后台页（coupons/orders/points/purchases/settlements/reports/…）

@@ -340,6 +340,8 @@ async function main() {
     // S5.3 门店变更申请
     ['store:change:submit', '提交门店变更申请', 'store'],
     ['store:change:review', '审核门店变更申请', 'store'],
+    // S5.4-A 站内信发布（仅主体/平台；追加在末尾，已有权限的固定主键不变）
+    ['notification:send', '发布站内信', 'notification'],
   ];
 
   const permissionSeeds: Array<{ id: number; code: string; name: string; group: string }> = [];
@@ -409,6 +411,8 @@ async function main() {
     'report:view',
     // S5.2：店员可查看（隔离到「本店消费过的」）用户
     'user:view',
+    // S5.4-A：店员可查看发给本门店的站内信
+    'notification:view',
   ];
 
   const roleDefs: Array<[number, string, string, RoleScope, string[]]> = [
