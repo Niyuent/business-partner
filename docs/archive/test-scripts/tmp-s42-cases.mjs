@@ -50,7 +50,7 @@ const S2 = await login('sub02');
 
 const PERIOD_START = '2026-09-01T00:00:00.000Z';
 const PERIOD_END = '2026-10-01T00:00:00.000Z';
-const MID = "UTC_TIMESTAMP() - INTERVAL 10 DAY"; // 落在 9 月周期内
+const MID = "'2026-09-15 00:00:00'"; // 必须落在固定的 9 月周期内；不能用 UTC_TIMESTAMP() 相对时间，否则跨月后自动滑出周期
 /** ISO8601 → MySQL DATETIME 字面量（'2026-09-01T00:00:00.000Z' → '2026-09-01 00:00:00'）。
  *  仅用于 SQL 比较；API 请求体仍传 ISO（DTO 用 @IsISO8601 校验）。
  *  Prisma 以 UTC 写入 DATETIME 列，故此处按 UTC 字面量比对即可命中。 */
@@ -163,6 +163,8 @@ sql(`INSERT INTO users (id, phone, nickname, status, registeredAt, createdAt, up
 // ---------------------------------------------------------------- 用例 6：性能（10000 条核销 < 5 秒）
 {
   // 清掉之前的测试核销，给 merchant 2 在 2026-05 周期造 10000 条
+  // ⚠️ 核销时间必须用**固定值**（2026-07-15，落在 2026-05-01~09-01 账期内）；
+  //    用 UTC_TIMESTAMP() - INTERVAL N DAY 这类相对时间，跨月后会滑出账期导致金额算成 0（2026-10-13 曾踩坑）
   sql(`DELETE FROM redemption_records WHERE code LIKE 'S42P%'; DELETE FROM coupon_instances WHERE code LIKE 'S42P%';`);
   const CHUNK = 1000;
   for (let batch = 0; batch < 10; batch++) {
@@ -170,7 +172,7 @@ sql(`INSERT INTO users (id, phone, nickname, status, registeredAt, createdAt, up
     for (let i = 0; i < CHUNK; i++) {
       const id = 50000 + batch * CHUNK + i;
       ci.push(`(${id}, 4001, 1002, 'S42P${id}', 2, 'EXCHANGE', 0, 'UNUSED', UTC_TIMESTAMP(), UTC_TIMESTAMP() + INTERVAL 1 DAY, UTC_TIMESTAMP(), UTC_TIMESTAMP())`);
-      rr.push(`(${id}, 'S42P${id}', 4001, 101, 2, 1, 1002, 1, 1, NULL, 'MANUAL', 'SUCCESS', UTC_TIMESTAMP() - INTERVAL 100 DAY, UTC_TIMESTAMP())`);
+      rr.push(`(${id}, 'S42P${id}', 4001, 101, 2, 1, 1002, 1, 1, NULL, 'MANUAL', 'SUCCESS', '2026-07-15 00:00:00', UTC_TIMESTAMP())`);
     }
     sql(`INSERT INTO coupon_instances (id, userId, templateId, code, issuerMerchantId, source, pointsCost, status, obtainedAt, expireAt, createdAt, updatedAt) VALUES ${ci.join(',')};
          INSERT INTO redemption_records (couponInstanceId, code, userId, storeId, merchantId, operatorId, templateId, faceValue, discountAmount, orderId, channel, status, redeemedAt, createdAt) VALUES ${rr.join(',')};`);
