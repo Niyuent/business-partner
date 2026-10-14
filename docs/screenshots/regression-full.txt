@@ -1,14 +1,20 @@
-===== [regression] 重置 seed 基线 =====
+﻿===== [regression] 重置 seed 基线 =====
 
 ===== [regression] S1 商家与权限（auth/RBAC/入驻/授权/审计） (tmp-s1-cases) =====
-mysql: [Warning] Using a password on the command line interface can be insecure.
+node : mysql: [Warning] Using a password on the command line interface can be insecure.
+所在位置 C:\Users\59746\AppData\Local\Temp\genie-ps-1791998233646-qu7a9i.ps1:954 字符: 18
++ cd d:/shangmeng; node scripts/regression.mjs 2>&1 | Out-File -FilePat ...
++                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (mysql: [Warning...an be insecure.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
 mysql: [Warning] Using a password on the command line interface can be insecure.
 mysql: [Warning] Using a password on the command line interface can be insecure.
 mysql: [Warning] Using a password on the command line interface can be insecure.
 mysql: [Warning] Using a password on the command line interface can be insecure.
 ———— auth / RBAC ————
 ✅ [A1] admin 登录成功并返回 token :: token=ok
-✅ [A2] 登录返回角色 + 权限码快照 :: roles=["MAIN_ADMIN"] perms#49
+✅ [A2] 登录返回角色 + 权限码快照 :: roles=["MAIN_ADMIN"] perms#50
 ✅ [A3] 错误口令 → 401 :: HTTP=401 INVALID_CREDENTIALS
 ✅ [A4] 未登录访问 /auth/profile → 401 :: HTTP=401 INVALID_CREDENTIALS
 ✅ [A5] admin profile：userType=MERCHANT 且 merchant.type=MAIN :: userType=MERCHANT type=MAIN
@@ -20,7 +26,7 @@ mysql: [Warning] Using a password on the command line interface can be insecure.
 
 ———— 入驻审核 ————
 ✅ [B1] 待审列表含 seed 的 PENDING 商家(#4) :: total=1
-✅ [B2] 公开提交入驻申请 → 成功且落库 PENDING :: HTTP=201 id=13
+✅ [B2] 公开提交入驻申请 → 成功且落库 PENDING :: HTTP=201 id=17
 ✅ [B3] sub02（无 merchant:audit）审核 → 403 :: HTTP=403 PERMISSION_DENIED
 ✅ [B4] admin 审核通过 → APPROVED 且创建账号 :: HTTP=201 status=APPROVED acct=1
 ✅ [B5] 重复审核已通过的单 → 4xx :: HTTP=409 MERCHANT_NOT_PENDING
@@ -28,13 +34,13 @@ mysql: [Warning] Using a password on the command line interface can be insecure.
 ———— 授权管理 ————
 ✅ [C1] seed 授权列表含 SUB-01 启用授权 :: total=1
 ✅ [C2] sub01 me/authorizations 授权范围含 T1(1001) :: data={"merchantId":2,"merchantName":"城南旗舰店","merchantType":"SUB","canIssueMainCoupon":true,"issueMainCoup
-✅ [C3] 主体给 sub02 授权(SPECIFIED T1) → 成功 :: HTTP=201 id=34
+✅ [C3] 主体给 sub02 授权(SPECIFIED T1) → 成功 :: HTTP=201 id=43
 ✅ [C4] 重复授权 → 409 AUTHORIZATION_EXISTS :: HTTP=409 AUTHORIZATION_EXISTS
 ✅ [C5] 关闭授权 → 成功 :: HTTP=200 undefined
 ✅ [C6] 重复关闭 → 幂等 alreadyDisabled=true :: HTTP=200 alreadyDisabled=true
 ✅ [C7] 授权日志有记录 :: total=5
 ✅ [C8] sub01 传别家 subMerchantId=3 → 403（不静默忽略） :: HTTP=403 FORBIDDEN_SCOPE
-  （已清理临时申请 #13 与临时授权 #34）
+  （已清理临时申请 #17 与临时授权 #43）
 
 ===== S1 结果：23 通过 / 0 失败 =====
 
@@ -45,26 +51,26 @@ mysql: [Warning] Using a password on the command line interface can be insecure.
 mysql: [Warning] Using a password on the command line interface can be insecure.
 ———— 券模板（H1 创建者必须主体） ————
 ✅ [A9] sub01 创建模板 → 403（无 coupon:create / H1） :: HTTP=403 PERMISSION_DENIED
-✅ [T1] admin 创建模板 → 成功且初始 DRAFT :: HTTP=201 id=2138
+✅ [T1] admin 创建模板 → 成功且初始 DRAFT :: HTTP=201 id=2190
 ✅ [T2] publish → PUBLISHED :: HTTP=200 status=PUBLISHED
 
 ———— 券码预生成 ————
-✅ [K1] 预生成券码 → 成功且返回 5 个码 :: HTTP=201 batchNo=2138-20261014-001 n=5
+✅ [K1] 预生成券码 → 成功且返回 5 个码 :: HTTP=201 batchNo=2190-20261014-001 n=5
 ✅ [K2] 同批次号重复生成 → 409 BATCH_ALREADY_EXISTS :: HTTP=409 BATCH_ALREADY_EXISTS
 
 ———— 发券授权校验（H2） ————
 ✅ [A1] 未授权附属 sub02 发主体券 → 403 :: HTTP=403 PERMISSION_DENIED
 ✅ [A2] 已授权附属 sub01 发未授权券 T3 → 403 :: HTTP=403 TEMPLATE_NOT_IN_AUTHORIZED_SCOPE
-✅ [I1] sub01 发授权范围内的主体券 T1 → 成功且券码已绑定 :: HTTP=201 code=WFSVY4AYDU4S
+✅ [I1] sub01 发授权范围内的主体券 T1 → 成功且券码已绑定 :: HTTP=201 code=RGZDACRAQCFA
 
 ———— 核销与冲正 ————
-✅ [R1] 店员核销 → 成功生成 SUCCESS 记录 :: HTTP=201 id=80081
+✅ [R1] 店员核销 → 成功生成 SUCCESS 记录 :: HTTP=201 id=120114
 ✅ [A7] 同券重复核销 → 409 COUPON_ALREADY_USED（H4 幂等） :: HTTP=409 COUPON_ALREADY_USED
 ✅ [R2] 冲正 → 成功且券回 UNUSED :: HTTP=201 coupon=UNUSED
 
 ———— 过期券核销（H5） ————
 ✅ [A4] 过期券核销 → COUPON_EXPIRED 且无 SUCCESS 记录 :: HTTP=400 undefined
-  （已清理临时模板 #2138 与其券码/批次，及测试核销）
+  （已清理临时模板 #2190 与其券码/批次，及测试核销）
 
 ===== S2 结果：12 通过 / 0 失败 =====
 
@@ -76,14 +82,14 @@ mysql: [Warning] Using a password on the command line interface can be insecure.
 ———— 成功用例 ————
 ✅ [S1] 账户列表 200 且含 balance/expiringSoon 字段 :: HTTP=200 total=2 keys=id,userId,userName,userPhone,balance,totalEarned,totalSpent,totalExpired,expiringSoon,version,updatedAt
 ✅ [S2] 详情 balance=120 且 available=40（过期 80 不计入可用） :: balance=120 available=40
-✅ [S2] 过期批次 usable=false :: expiredBatch={"id":250747,"type":"ADJUST","amount":80,"remainingAmount":80,"expireAt":"2026-1
+✅ [S2] 过期批次 usable=false :: expiredBatch={"id":331085,"type":"ADJUST","amount":80,"remainingAmount":80,"expireAt":"2026-1
 ✅ [S3] 录单送分 201 且 points=100 :: HTTP=201 points=100
-✅ [S3] EARN 批次有效期约 +12 月 :: expireAt=2027-10-14T16:41:29.851Z (~12 月)
+✅ [S3] EARN 批次有效期约 +12 月 :: expireAt=2027-10-14T17:17:29.320Z (~12 月)
 ✅ [S4] 余额精确累加 = 100 :: balance=100
 ✅ [S5] 人工 +50 成功且生成 ADJUST 流水 :: HTTP=201 ADJUST=1 amount=50
 ✅ [S6] adjust 写 audit_logs :: audit=3
 ✅ [S7] type=EARN 仅返回 EARN、type=ADJUST 仅返回 ADJUST :: EARN=1 ADJUST=1
-✅ [S8] 规则列表含平台默认(merchantId=0)与商家(merchantId=1) :: rules=49/m0 50/m1
+✅ [S8] 规则列表含平台默认(merchantId=0)与商家(merchantId=1) :: rules=59/m0 60/m1
 ✅ [S8] 修改规则 earnRatio=2 生效并写审计 :: HTTP=200 earnRatio=2 audit=1
   （已还原 earnRatio=1）
 ✅ [S9] FIFO 先扣早过期批次A(50→20)、B(80 不动) :: A=20 B=80
@@ -125,18 +131,18 @@ mysql: [Warning] Using a password on the command line interface can be insecure.
 ✅ [遗留2] 不带 orderId/orderNo → 400 ORDER_ID_REQUIRED :: HTTP 400 ORDER_ID_REQUIRED | 消费录单送积分必须带 orderId 或 orderNo（一单只送一次积分靠它做幂等键）；人工调整请走 POST /points/adjust
 
 ———— 用例1：FIFO 扣减（A+30d/100，B+10d/50，C+20d/80，兑换 120） ————
-  兑换前批次（按 expireAt 升序）：#250768(50, 2026-10-24) #250769(80, 2026-11-03) #250767(100, 2026-11-13)
-✅ [用例1] 兑换 120 成功，余额 230 → 110 :: HTTP 201 余额=110 券码=YXTCHNZB35GX
+  兑换前批次（按 expireAt 升序）：#331106(50, 2026-10-24) #331107(80, 2026-11-03) #331105(100, 2026-11-13)
+✅ [用例1] 兑换 120 成功，余额 230 → 110 :: HTTP 201 余额=110 券码=D2AW98MXQXQX
 ✅ [用例1] B(+10d) 50 → 0（最先过期，优先扣） :: 50 → 0
 ✅ [用例1] C(+20d) 80 → 10（扣 70） :: 80 → 10
 ✅ [用例1] A(+30d) 100 → 100（不动） :: 100 → 100
-✅ [用例1] 生成 2 条 SPEND 流水（-50 / -70），各指回券实例 :: SPEND 2 条：-70(批次扣减，实例#9000120) -50(批次扣减，实例#9000120)
-✅ [用例1] 券实例：source=EXCHANGE、归属主体商家、券码已绑定 :: source=EXCHANGE 券码=YXTCHNZB35GX 发券方=1
+✅ [用例1] 生成 2 条 SPEND 流水（-50 / -70），各指回券实例 :: SPEND 2 条：-70(批次扣减，实例#9000200) -50(批次扣减，实例#9000200)
+✅ [用例1] 券实例：source=EXCHANGE、归属主体商家、券码已绑定 :: source=EXCHANGE 券码=D2AW98MXQXQX 发券方=1
 
 ———— 用例1b：同一批次二次兑换（originBatchId 关联，无唯一键冲突） ————
-✅ [用例1b] 第一次兑换 60 → 批次剩 40，无 500 :: HTTP=201 批次#250772 剩 40
-✅ [用例1b] 第二次兑换 30（同一批次）→ 批次剩 10，无 500 :: HTTP=201 批次#250772 剩 10
-✅ [用例1b] 生成 2 条 SPEND，originBatchId 均指向批次 B :: SPEND=2 origin=250772,250772 批次#250772
+✅ [用例1b] 第一次兑换 60 → 批次剩 40，无 500 :: HTTP=201 批次#331110 剩 40
+✅ [用例1b] 第二次兑换 30（同一批次）→ 批次剩 10，无 500 :: HTTP=201 批次#331110 剩 10
+✅ [用例1b] 生成 2 条 SPEND，originBatchId 均指向批次 B :: SPEND=2 origin=331110,331110 批次#331110
 ✅ [用例1b] SPEND 的 sourceTransactionId 为 NULL（唯一键仅约束 EXPIRE） :: source=,
 
 ———— 用例2：并发兑换同一模板（用户余额刚好 100） ————
@@ -144,9 +150,9 @@ mysql: [Warning] Using a password on the command line interface can be insecure.
 ✅ [用例2] 余额未变负、只生成 1 张券 :: 余额 100 → 0；券实例数=1
 
 ———— 用例3：相同 requestId 重复提交（幂等） ————
-✅ [用例3] 两次都 200，第二次 idempotent=true 且返回同一张券 :: HTTP=201/201 券实例 9000124 / 9000124 idempotent=true
+✅ [用例3] 两次都 200，第二次 idempotent=true 且返回同一张券 :: HTTP=201/201 券实例 9000204 / 9000204 idempotent=true
 ✅ [用例3] 重复提交没有二次扣积分 :: 余额=100（110 - 10 = 100）
-✅ [用例3] 并发同一 requestId → 只生成 1 张券，无 500 :: HTTP=201/201 券实例 9000125 / 9000125
+✅ [用例3] 并发同一 requestId → 只生成 1 张券，无 500 :: HTTP=201/201 券实例 9000205 / 9000205
 
 ———— 用例4：余额够但批次已过期 → 409 ————
 ✅ [用例4] A(已过期100) + B(未过期50)，兑换 80 → 409 BALANCE_NOT_ENOUGH :: HTTP 409 BALANCE_NOT_ENOUGH | 余额=150 可用=50 | 可用积分不足：需 80，未过期批次可用 50（过期积分不可用于兑换）
@@ -163,8 +169,8 @@ mysql: [Warning] Using a password on the command line interface can be insecure.
 ✅ [F] 附属查与自己无关的兑换记录 → 403 FORBIDDEN_SCOPE :: HTTP 403 FORBIDDEN_SCOPE
 
 ———— 成功用例（其余） ————
-✅ [S] 兑换记录列表（券码 / 消耗积分 / 券状态） :: HTTP 200 共 3 条，样例 {"id":141,"userId":1003,"userName":"çŽ‹äº”","userPhone":"13800000003","templateId":2148,"templateName":"S32 限领1张券","faceValue":10,"couponInstanceId":9
-✅ [S] 店员代客兑换（T2 需 5 分） :: HTTP 201  消耗 5 分，券码 ZGDR2VSCESXK | success
+✅ [S] 兑换记录列表（券码 / 消耗积分 / 券状态） :: HTTP 200 共 3 条，样例 {"id":193,"userId":1003,"userName":"çŽ‹äº”","userPhone":"13800000003","templateId":2200,"templateName":"S32 限领1张券","faceValue":10,"couponInstanceId":9
+✅ [S] 店员代客兑换（T2 需 5 分） :: HTTP 201  消耗 5 分，券码 QRRMCWV3X3CP | success
 ✅ [S] 兑换后账户可用积分与余额一致扣减 :: 余额=15 可用=15
 ✅ [S] 模板已发放数随兑换递增（条件更新生效） :: S32 幂等券 issuedCount=2（含并发 + 幂等重复提交各 1 次）
 
@@ -173,26 +179,11 @@ mysql: [Warning] Using a password on the command line interface can be insecure.
 ✅ [用例9] 积分未扣（余额不变） :: 100 → 100
 ✅ [用例9] 券码未被占用（未发放数不变） :: 10 → 10
 ✅ [用例9] 未生成券实例 / 兑换记录 / SPEND 流水 :: 实例=0 兑换记录=0 SPEND=0
-✅ [用例9] 移除注入后同一请求成功（失败是注入导致，不是逻辑错误） :: HTTP 201 券码=NZPRF4W24PNU
+✅ [用例9] 移除注入后同一请求成功（失败是注入导致，不是逻辑错误） :: HTTP 201 券码=2CGFKFZQWHAT
 
 S3.2 用例结果：通过 39 条，失败 0 条
 
 ===== [regression] S3.3 积分过期清零 (tmp-s33-cases) =====
-mysql: [Warning] Using a password on the command line interface can be insecure.
-mysql: [Warning] Using a password on the command line interface can be insecure.
-mysql: [Warning] Using a password on the command line interface can be insecure.
-mysql: [Warning] Using a password on the command line interface can be insecure.
-mysql: [Warning] Using a password on the command line interface can be insecure.
-mysql: [Warning] Using a password on the command line interface can be insecure.
-mysql: [Warning] Using a password on the command line interface can be insecure.
-mysql: [Warning] Using a password on the command line interface can be insecure.
-mysql: [Warning] Using a password on the command line interface can be insecure.
-mysql: [Warning] Using a password on the command line interface can be insecure.
-mysql: [Warning] Using a password on the command line interface can be insecure.
-mysql: [Warning] Using a password on the command line interface can be insecure.
-mysql: [Warning] Using a password on the command line interface can be insecure.
-mysql: [Warning] Using a password on the command line interface can be insecure.
-mysql: [Warning] Using a password on the command line interface can be insecure.
 mysql: [Warning] Using a password on the command line interface can be insecure.
 mysql: [Warning] Using a password on the command line interface can be insecure.
 mysql: [Warning] Using a password on the command line interface can be insecure.
@@ -214,21 +205,12 @@ mysql: [Warning] Using a password on the command line interface can be insecure.
 ✅ [用例5] 并发触发只有 1 个实际处理（另一个跳过或 0 笔） :: a={processed:1,skipped:false} b={processed:0,skipped:true}
 ✅ [用例5] 无重复 EXPIRE、余额扣一次 :: expire=1 acct=0|90
 ✅ [用例6] 10000 条全部处理 :: processed=10000 expired=10000
-✅ [用例6] 耗时 < 30 秒（实际 8.72s） :: 8719 ms
+✅ [用例6] 耗时 < 30 秒（实际 8.64s） :: 8639 ms
 ✅ [审计] 过期任务写审计日志（POINTS_EXPIRE） :: audit rows=8
 
 ===== S3.3 结果：15 通过 / 0 失败 =====
 
 ===== [regression] S3.4 订单与异常订单处理 (tmp-s34-cases) =====
-mysql: [Warning] Using a password on the command line interface can be insecure.
-mysql: [Warning] Using a password on the command line interface can be insecure.
-mysql: [Warning] Using a password on the command line interface can be insecure.
-mysql: [Warning] Using a password on the command line interface can be insecure.
-mysql: [Warning] Using a password on the command line interface can be insecure.
-mysql: [Warning] Using a password on the command line interface can be insecure.
-mysql: [Warning] Using a password on the command line interface can be insecure.
-mysql: [Warning] Using a password on the command line interface can be insecure.
-mysql: [Warning] Using a password on the command line interface can be insecure.
 mysql: [Warning] Using a password on the command line interface can be insecure.
 mysql: [Warning] Using a password on the command line interface can be insecure.
 mysql: [Warning] Using a password on the command line interface can be insecure.
@@ -270,7 +252,7 @@ mysql: [Warning] Using a password on the command line interface can be insecure.
 ✅ [用例2] 账户 balance 回 100 :: acct=100|0|0
 ✅ [用例2b] B.remaining 恢复 40（但 expireAt 仍过期） :: B.remain=40 expired=1
 ✅ [用例3] 标记 + 处理都有审计（2 条） :: audit=2
-✅ [用例3] 处理人/结果/时间落库（handled 而非删除） :: order=NORMAL|已冲正 50 分|1|2026-10-14 16:42:46.505
+✅ [用例3] 处理人/结果/时间落库（handled 而非删除） :: order=NORMAL|已冲正 50 分|1|2026-10-14 17:18:40.219
 ✅ [用例3] 异常订单未删除（仍在库） :: order exists
 ✅ [用例4] 并发处理只有 1 个成功，另 1 个 409 ORDER_ALREADY_HANDLED :: a=409/ORDER_ALREADY_HANDLED b=201/undefined
 ✅ [用例5] 附属标记别家订单 → 403 STORE_NOT_OWNED :: status=403 reason=STORE_NOT_OWNED
@@ -281,6 +263,30 @@ mysql: [Warning] Using a password on the command line interface can be insecure.
 ===== S3.4 结果：20 通过 / 0 失败 =====
 
 ===== [regression] S4.1 采购记录 (tmp-s41-cases) =====
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
 mysql: [Warning] Using a password on the command line interface can be insecure.
 ✅ [用例1] 新增成功，totalAmount = 50 :: status=201 total=50
 ✅ [用例1] purchaseNo 格式 {main}-{sub}-{yyyymmdd}-{seq} :: purchaseNo=1-2-20261014-1
@@ -294,7 +300,7 @@ mysql: [Warning] Using a password on the command line interface can be insecure.
 ✅ [用例4] 附属结算 → 403（结算权归主体） :: status=403 reason=PERMISSION_DENIED
 ✅ [用例5] 无 DELETE 端点（404/405，采购不可删除） :: status=404
 ✅ [用例6] 5 并发新增全部成功（无 500） :: 成功 5/5
-✅ [用例6] purchaseNo 互不重复 :: nos=["1-2-20261014-3","1-2-20261014-7","1-2-20261014-5","1-2-20261014-6","1-2-20261014-4"]
+✅ [用例6] purchaseNo 互不重复 :: nos=["1-2-20261014-3","1-2-20261014-5","1-2-20261014-6","1-2-20261014-4","1-2-20261014-7"]
 ✅ [用例7] settle 写 audit_logs（PURCHASE_SETTLE） :: settle=200 audit=1
 ✅ [用例8] 附属(sub02)只看到自己作为 sub 的（subMerchantId 全为 3） :: list=[3]
 ✅ [用例8] 附属查别家(merchant 2) → 403 FORBIDDEN_SCOPE :: status=403 reason=FORBIDDEN_SCOPE
@@ -321,15 +327,15 @@ mysql: [Warning] Using a password on the command line interface can be insecure.
 ✅ [用例5] CSV 带 UTF-8 BOM（Excel 中文不乱码） :: firstChar=0xfeff
 ✅ [用例5] CSV 字段完整（券码/用户/核销时间/门店/面值/抵扣） :: contains=true
 ✅ [用例5] CSV 引号转义（字段被双引号包裹） :: quoted=true
-✅ [用例6] 10000 条核销生成对账单 < 5 秒 :: 1384ms
+✅ [用例6] 10000 条核销生成对账单 < 5 秒 :: 1087ms
 ✅ [用例6] 总额 = 10000（DB 聚合，非应用层循环） :: amount=10000 count=10000
 
 ===== S4.2 结果：18 通过 / 0 失败 =====
 
 ===== [regression] S5.1 C 端用户鉴权 (tmp-s51-cases) =====
 ———— C 端登录（code2session 模拟） ————
-✅ [L1] user-login 走通并签发 C 端 token :: HTTP=201 userId=9006 openid=dev_openid_s51-1791996191775
-✅ [L2] 同一 code 再登录 → 同一用户（openid 幂等） :: 第二次 userId=9006
+✅ [L1] user-login 走通并签发 C 端 token :: HTTP=201 userId=9010 openid=dev_openid_s51-1791998344404
+✅ [L2] 同一 code 再登录 → 同一用户（openid 幂等） :: 第二次 userId=9010
 ✅ [L3] 缺 code → 400 :: HTTP=400 code must be longer than or equal to 1 c
 
 ———— 令牌双向隔离 ————
@@ -339,14 +345,14 @@ mysql: [Warning] Using a password on the command line interface can be insecure.
 ✅ [I4] 无 token → /h5/** → 401 :: HTTP=401 INVALID_CREDENTIALS
 
 ———— C 端令牌可用 ————
-✅ [C1] /h5/me → 200 :: HTTP=200 id=9006
+✅ [C1] /h5/me → 200 :: HTTP=200 id=9010
 ✅ [C2] /h5/points/account → 200 且新用户账户存在（余额 0） :: HTTP=200 balance=0
 ✅ [C3] /h5/templates → 200 且每条含 status/pointsCost :: n=13
 ✅ [C4] /h5/points/transactions → 200 :: HTTP=200 total=0
 
 ———— userId 防伪 / 兑换 ————
 ✅ [E1] 伪造 userId 兑换 → 403 FORBIDDEN_SCOPE :: HTTP=403 FORBIDDEN_SCOPE
-✅ [E2] 真实 userId 兑换（T2 需 5 分）→ 201 且返回券码 :: HTTP=201 code=KZY5D3K2E9A8 cost=5
+✅ [E2] 真实 userId 兑换（T2 需 5 分）→ 201 且返回券码 :: HTTP=201 code=P46CUZ6DYKHE cost=5
 ✅ [E3] 兑换后余额 = 100 - 5 = 95 :: balance=95
 
 ===== S5.1 结果：14 通过 / 0 失败 =====
@@ -405,7 +411,7 @@ mysql: [Warning] Using a password on the command line interface can be insecure.
 ✅ [F7] 审核不存在的申请 → 404 :: HTTP=404 RESOURCE_NOT_FOUND
 
 ———— 提交 / 并发 ————
-✅ [S1] 附属提交本店变更 → PENDING + changes 存 {old,new} :: HTTP=201 id=39 nameChange={"new":"S101中心店-195469","old":"S-101 中心店"}
+✅ [S1] 附属提交本店变更 → PENDING + changes 存 {old,new} :: HTTP=201 id=56 nameChange={"new":"S101中心店-348225","old":"S-101 中心店"}
 ✅ [F8] 同门店二次提交（已有 PENDING）→ 409 STORE_CHANGE_PENDING_EXISTS :: HTTP=409 STORE_CHANGE_PENDING_EXISTS
 ✅ [S2] 主体审核列表可见该申请 :: HTTP=200 total=1 found=true
 ✅ [S3] 审核详情返回变更前后对比 + 门店信息 :: HTTP=200 store=S-101 中心店
@@ -415,8 +421,8 @@ mysql: [Warning] Using a password on the command line interface can be insecure.
 ✅ [S5] 作废后本店申请列表为空（作废生效） :: 剩余=0
 
 ———— 审核通过（事务生效） ————
-✅ [S6] 作废后可重新提交 → 201 PENDING :: HTTP=201 id=40
-✅ [S7] 通过 → APPROVED 且 stores 同事务更新（电话落库 + 门店名经 API 校验） :: HTTP=201 status=APPROVED phone=13800001111 storeName(API)=S101中心店-195469
+✅ [S6] 作废后可重新提交 → 201 PENDING :: HTTP=201 id=57
+✅ [S7] 通过 → APPROVED 且 stores 同事务更新（电话落库 + 门店名经 API 校验） :: HTTP=201 status=APPROVED phone=13800001111 storeName(API)=S101中心店-348225
 ✅ [S8] 审核动作写审计 :: audit 1→2
 ✅ [F11] 已审核申请再审 → 409 STORE_CHANGE_NOT_PENDING :: HTTP=409 STORE_CHANGE_NOT_PENDING
 ✅ [F12] 作废已审核申请 → 409 STORE_CHANGE_NOT_PENDING :: HTTP=409 STORE_CHANGE_NOT_PENDING
@@ -427,6 +433,128 @@ mysql: [Warning] Using a password on the command line interface can be insecure.
   （已清理申请并还原 store 字段）
 
 ===== S5.3 结果：22 通过 / 0 失败 =====
+
+===== [regression] S5.4-A 站内信后端 (tmp-s54a-cases) =====
+mysql: [Warning] Using a password on the command line interface can be insecure.
+———— 发布：越权 / 校验 ————
+✅ [F1] 附属发布 → 403 PERMISSION_DENIED :: HTTP=403 PERMISSION_DENIED
+✅ [F2] 店员发布 → 403 PERMISSION_DENIED :: HTTP=403 PERMISSION_DENIED
+✅ [F3] 发给不存在的商家 → 403 FORBIDDEN_SCOPE :: HTTP=403 FORBIDDEN_SCOPE
+✅ [F4] 目标非直属附属（主体自身）→ 403 FORBIDDEN_SCOPE :: HTTP=403 FORBIDDEN_SCOPE
+✅ [F5] 发给范围外门店 → 403 STORE_NOT_OWNED :: HTTP=403 STORE_NOT_OWNED
+✅ [F6] MERCHANT 缺 targetIds → 400 NOTIFICATION_TARGET_REQUIRED :: HTTP=400 NOTIFICATION_TARGET_REQUIRED
+✅ [F7] ALL_MERCHANTS 夹带 targetIds → 400 NOTIFICATION_TARGET_INVALID :: HTTP=400 NOTIFICATION_TARGET_INVALID
+✅ [F8] 标题全空白 → 400 :: HTTP=400 title should not be empty
+✅ [F9] 未带 token → 401 :: HTTP=401
+✅ [F10] 以上失败请求均未落库 :: rows=0
+
+———— 发给附属商家（MERCHANT 维度） ————
+✅ [S1] 主体发给附属 2 → 201 count=1 :: HTTP=201 count=1 id=880043
+✅ [S2] 发布写审计 notification:send :: audit 0→1
+✅ [S3] sub01 列表可见 + 带 unreadCount :: HTTP=200 total=2 unread=2
+✅ [F11] sub02 看不到发给商家 2 的通知 :: HTTP=200 total=1
+✅ [F12] sub02 伪造 merchantId/receiverId 参数仍看不到 :: HTTP=200 total=1
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+✅ [F13] 店员看不到商家级（MERCHANT）通知 :: HTTP=200 total=0
+✅ [F14] sub02 标记别家通知已读 → 404（不泄露）且状态未变 :: HTTP=404 RESOURCE_NOT_FOUND db=UNREAD
+
+———— 发给门店（STORE 维度） ————
+✅ [S4] 主体发给门店 101 → 201 count=1 :: HTTP=201 id=880044
+✅ [S5] 店员可见本店通知，未读数=1 :: HTTP=200 unread=1
+✅ [S6] sub01 同时可见旗下门店 101 的通知 :: HTTP=200 total=3
+✅ [F15] sub02 看不到门店 101 的通知 :: HTTP=200
+✅ [S7] 店员标记已读 → READ + alreadyRead=false :: HTTP=200 READ already=false
+✅ [S8] 重复标记已读幂等 → 200 alreadyRead=true，未读数归 0 :: HTTP=200 already=true unread=0
+✅ [F16] 非法 id → 400 :: HTTP=400
+
+———— 筛选 / 分页 / 全部已读 ————
+✅ [S9] readStatus=UNREAD 只返回未读；店员已读的 S101 对 sub01 仍为未读（各自已读） :: HTTP=200 sub01含M2=true sub01含S101=true clerk含S101=false
+✅ [S10] 分页 pageSize=1 → 1 条且 total≥2 :: HTTP=200 total=3
+✅ [S11] sub01 全部已读 → updated≥1、未读数 0、notification_reads 有记录 :: HTTP=200 updated=3 unread=0 reads=3
+
+———— 广播展开 ————
+✅ [S12] 主体 ALL_MERCHANTS → 展开为直属已审核附属各一行 :: HTTP=201 count=2 expect=2 rows=2
+✅ [S13] sub02 收到广播（各自独立一行） :: HTTP=200
+✅ [S14] 平台 ALL_STORES → 展开为全部营业门店各一行 :: HTTP=201 count=3 expect=3
+✅ [S15] 平台账号无接收身份 → 列表为空 :: HTTP=200 total=0
+✅ [S16] 主体只看到发给自己的（seed 异常订单提醒），看不到自己发出的 :: HTTP=200 total=1 leaked=0
+  （已清理 S54A- 前缀测试通知；审计日志保留）
+
+===== S5.4-A 结果：32 通过 / 0 失败 =====
+
+===== [regression] S5.4-B1 通知每人各自已读 + 我发过的 + 口径统一 (tmp-s54b1-cases) =====
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+（主体=1 本店=101 本商家=2 别家=3 本店最早管理员=4 可发门店数=3）
+
+———— 每人各自已读（同一门店通知，店员/附属互不影响） ————
+✅ [A1] 主体→指定门店发布成功（写 senderId + sendBatchId） :: HTTP=201 batch=1fe3fbc5-7478-42c7-a4ef-7b659eeb32fd
+✅ [A2] 发布人落库（senderId = admin 的账号 id） :: senderId=1
+✅ [A3] 店员标记已读 → 200 且 alreadyRead=false :: HTTP=200 alreadyRead=false
+✅ [A4] 店员未读数 -1 :: 1 → 0
+✅ [A5] 附属未读数**不受影响**（各自已读） :: 1 → 1
+✅ [A6] 店员 UNREAD 列表已不含该条；附属 UNREAD 列表仍含该条 :: clerk含=false sub01含=true
+✅ [A7] notification_reads 仅 1 条（店员） :: count=1
+✅ [A8] 附属也标记已读 → 200 且各自一行（共 2 条） :: HTTP=200 reads=2
+
+———— 重复已读幂等 ————
+✅ [B1] 重复标记 → 200 + alreadyRead=true，且不新增记录 :: HTTP=200 alreadyRead=true reads=2
+✅ [B2] 全部已读返回实际更新条数（≥0 的整数） :: HTTP=200 updated=0
+✅ [B3] 全部已读后店员未读数为 0 :: unread=0
+
+———— 越权 / 404 ————
+✅ [C1] 标记别家通知 → 404（不泄露存在性） :: HTTP=404 RESOURCE_NOT_FOUND
+✅ [C2] 别家通知不出现在自己的列表 :: found=false
+✅ [C3] 平台账号无接收身份 → 列表空、未读数 0 :: HTTP=200 unread=0
+
+———— 我发过的通知（sent） ————
+✅ [S1] ALL_STORES 展开 N 行但 sent 只返回 1 条批次 :: HTTP=201 groups=1 展开行数=3
+✅ [S2] 批次 receiverCount = 展开行数 :: receiverCount=3 期望=3
+✅ [S3] 同一秒内两次同标题发送 → 返回 2 条（不误合并） :: groups=2
+✅ [S4] 两条批次号不同 :: batch0=d2f083ac-02f8-4496-a600-3c52696f7c73 batch1=37a2befb-0658-435e-8d86-2b57f344c8d9
+✅ [S5] sent 只返回自己发的（admin 不含 platform 的） :: admin批次=5 platform批次=0
+✅ [S6] 附属访问 sent → 403（无 notification:send） :: HTTP=403 PERMISSION_DENIED
+✅ [S7] sent 关键词筛选命中 1 条 :: HTTP=200 n=1
+
+———— 工作台未读数口径统一 ————
+✅ [W1] admin：工作台 unreadNotifications === 通知未读数 :: todo=1 list=1
+✅ [W2] sub01：工作台口径同样一致 :: todo=6 list=6
+
+———— 迁移回填 / 幂等 ————
+✅ [M1] 历史 READ 通知回填到「接收方最早管理员」(#4) :: before=0 read.owner=4/2026-10-15
+✅ [M2] 迁移可重复执行（第二次不产生重复行） :: reads=1
+✅ [M3] 每次执行写一条回填审计（含 成功/跳过 计数） :: audit=2
+✅ [M4] 迁移结构落地（senderId/sendBatchId 存在） :: cols=sendBatchId,senderId
+✅ [M5] readStatus 保留未删（deprecated，便于回滚） :: col=readStatus
+  （已清理测试通知、阅读记录与回填用例数据）
+
+===== S5.4-B1 结果：28 通过 / 0 失败 =====
 
 ===== [regression] 汇总 =====
 ✅ tmp-s1-cases :: ===== S1 结果：23 通过 / 0 失败 =====
@@ -440,5 +568,7 @@ mysql: [Warning] Using a password on the command line interface can be insecure.
 ✅ tmp-s51-cases :: ===== S5.1 结果：14 通过 / 0 失败 =====
 ✅ tmp-s52-cases :: ===== S5.2 结果：15 通过 / 0 失败 =====
 ✅ tmp-s53-cases :: ===== S5.3 结果：22 通过 / 0 失败 =====
+✅ tmp-s54a-cases :: ===== S5.4-A 结果：32 通过 / 0 失败 =====
+✅ tmp-s54b1-cases :: ===== S5.4-B1 结果：28 通过 / 0 失败 =====
 
 结果：全部通过 ✅
