@@ -3,6 +3,7 @@ import { MerchantType, PointTxnType, Prisma } from '@prisma/client';
 import { toCsv } from '../../common/utils/csv.util';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { JwtPayload } from '../auth/jwt-payload';
+import { NotificationService } from '../notification/notification.service';
 import { ReportKey, ReportQueryDto, TrendQueryDto } from './dto/report.dto';
 
 /**
@@ -17,7 +18,10 @@ import { ReportKey, ReportQueryDto, TrendQueryDto } from './dto/report.dto';
 export class ReportService {
   private readonly logger = new Logger('Report');
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationService,
+  ) {}
 
   // ---------------------------------------------------------------- 可见范围
 
@@ -535,16 +539,12 @@ export class ReportService {
       ...(merchantId ? { merchantId } : {}),
     };
 
-    // 通知是多态接收方（receiverType + receiverId）：把「商家 id」和「账号 id」都算进去，
-    // 避免 seed 口径不一致时待办数恒为 0
-    const receivers = [merchantId, user.sub].filter((v): v is number => typeof v === 'number');
-    const unreadWhere: Prisma.NotificationWhereInput = { readStatus: 'UNREAD' };
-    if (receivers.length) unreadWhere.receiverId = { in: receivers };
-
+    // 未读数统一走 NotificationService（S5.4-B1）：口径 = 接收范围 ∩ 无「我的」阅读记录，
+    // 保证「工作台未读数 === 通知列表未读数」，此处不再重复实现（旧实现只看 receiverId，会串号）。
     const [pendingMerchants, abnormalOrders, unreadNotifications] = await Promise.all([
       this.prisma.merchant.count({ where: pendingWhere }),
       this.prisma.order.count({ where: abnormalWhere }),
-      this.prisma.notification.count({ where: unreadWhere }),
+      this.notifications.getUnreadCount(user),
     ]);
 
     return { pendingMerchants, abnormalOrders, unreadNotifications };

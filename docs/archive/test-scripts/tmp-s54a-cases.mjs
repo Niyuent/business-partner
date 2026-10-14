@@ -120,8 +120,10 @@ let m2Id = 0;
 }
 {
   const r = await call('PATCH', `notifications/${m2Id}/read`, S2);
-  const st = scalar(`SELECT readStatus FROM notifications WHERE id=${m2Id}`);
-  ok('F14', 'sub02 标记别家通知已读 → 404（不泄露）且状态未变', r.status === 404 && r.reason === 'RESOURCE_NOT_FOUND' && st === 'UNREAD', `HTTP=${r.status} ${r.reason} db=${st}`);
+  // S5.4-B1：已读落在 notification_reads（notifications.readStatus 已停写），故断言「未产生阅读记录」
+  const sub02AdminId = Number(scalar(`SELECT id FROM admin_users WHERE username='sub02'`));
+  const reads = Number(scalar(`SELECT COUNT(*) FROM notification_reads WHERE notificationId=${m2Id} AND adminUserId=${sub02AdminId}`));
+  ok('F14', 'sub02 标记别家通知已读 → 404（不泄露）且未产生阅读记录', r.status === 404 && r.reason === 'RESOURCE_NOT_FOUND' && reads === 0, `HTTP=${r.status} ${r.reason} reads=${reads}`);
 }
 
 // ============ 发给门店 101：门店维度 ============
@@ -162,9 +164,17 @@ let s101Id = 0;
 log('');
 log('———— 筛选 / 分页 / 全部已读 ————');
 {
+  // S5.4-B1 语义变更：已读按**登录账号**记（notification_reads）。S7 里是店员 CK 读的 S101，
+  // 对 sub01 不生效 —— 故 sub01 的 UNREAD 仍应包含 S101，而 CK 的 UNREAD 不含。
   const r = await call('GET', 'notifications?readStatus=UNREAD&pageSize=100', S1);
   const all = (r.data?.list ?? []).every((n) => n.readStatus === 'UNREAD');
-  ok('S9', 'readStatus=UNREAD 只返回未读（且不含已读的 S101）', r.status === 200 && all && has(r, m2Id) && !has(r, s101Id), `HTTP=${r.status} n=${r.data?.list?.length}`);
+  const ck = await call('GET', 'notifications?readStatus=UNREAD&pageSize=100', CK);
+  ok(
+    'S9',
+    'readStatus=UNREAD 只返回未读；店员已读的 S101 对 sub01 仍为未读（各自已读）',
+    r.status === 200 && all && has(r, m2Id) && has(r, s101Id) && !has(ck, s101Id),
+    `HTTP=${r.status} sub01含M2=${has(r, m2Id)} sub01含S101=${has(r, s101Id)} clerk含S101=${has(ck, s101Id)}`,
+  );
 }
 {
   const r = await call('GET', 'notifications?page=1&pageSize=1', S1);
@@ -173,8 +183,15 @@ log('———— 筛选 / 分页 / 全部已读 ————');
 {
   const r = await call('PATCH', 'notifications/read-all', S1);
   const c = await call('GET', 'notifications/unread-count', S1);
-  const st = scalar(`SELECT readStatus FROM notifications WHERE id=${m2Id}`);
-  ok('S11', 'sub01 全部已读 → updated≥1、未读数 0、库内 READ', r.status === 200 && r.data?.updated >= 1 && c.data?.unreadCount === 0 && st === 'READ', `HTTP=${r.status} updated=${r.data?.updated} unread=${c.data?.unreadCount} db=${st}`);
+  // S5.4-B1：已读落在 notification_reads（notifications.readStatus 已停写、仅保留供回滚）
+  const sub01AdminId = Number(scalar(`SELECT id FROM admin_users WHERE username='sub01'`));
+  const reads = Number(scalar(`SELECT COUNT(*) FROM notification_reads WHERE adminUserId=${sub01AdminId}`));
+  ok(
+    'S11',
+    'sub01 全部已读 → updated≥1、未读数 0、notification_reads 有记录',
+    r.status === 200 && r.data?.updated >= 1 && c.data?.unreadCount === 0 && reads >= 1,
+    `HTTP=${r.status} updated=${r.data?.updated} unread=${c.data?.unreadCount} reads=${reads}`,
+  );
 }
 
 // ============ 广播：ALL_MERCHANTS / ALL_STORES ============

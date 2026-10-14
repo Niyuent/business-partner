@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import {
   MerchantStatus,
@@ -13,16 +14,19 @@ import { BizException, ReasonCode } from '../../common/exceptions/biz.exception'
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../audit-log/audit.service';
 import { JwtPayload } from '../auth/jwt-payload';
-import { QueryNotificationDto, SendNotificationDto } from './dto/notification.dto';
+import { QueryNotificationDto, QuerySentNotificationDto, SendNotificationDto } from './dto/notification.dto';
 
 /**
- * 站内信（S5.4-A）
+ * 站内信（S5.4-A 接收/发布 + S5.4-B1 每人各自已读、发送人、我发过的）
  *
  * 接收侧隔离（receiverType + receiverId 双维度，一律由 JWT 推导）：
  *  - 店员           = (STORE, 本门店)
  *  - 主体 / 附属商家 = (MERCHANT, 本商家) ∪ (STORE, 本商家旗下门店)
  *  - 平台账号        无接收身份 → 列表恒为空
  * 不在接收身份内的通知一律 404（不泄露存在性）。
+ *
+ * 已读口径（S5.4-B1）：`notification_reads(notificationId, adminUserId)` —— **按登录账号**记，
+ * 同一门店通知下店员与附属管理员互不影响；`notifications.readStatus/readAt` 已停写（deprecated，仅供回滚）。
  *
  * 发布侧：仅平台 / 主体（`notification:send` + 本服务二次断言），
  * 目标只能是本主体直属附属商家及其门店（平台 = 全部附属）。
@@ -51,6 +55,27 @@ export class NotificationService {
       or.push({ receiverType: ReceiverType.STORE, receiverId: { in: stores.map((s) => s.id) } });
     }
     return { OR: or };
+  }
+
+  /** 未读条件（按登录账号）：接收范围 ∩ 尚无我的阅读记录 */
+  private unreadWhere(mine: Prisma.NotificationWhereInput, adminUserId: number): Prisma.NotificationWhereInput {
+    return { AND: [mine, { reads: { none: { adminUserId } } }] };
+  }
+
+  /** 统一出口：把「本条是否已被当前账号读过」暴露为 alreadyRead / readStatus / readAt */
+  private withReadState<T extends { reads?: Array<{ readAt: Date }> }>(row: T) {
+    const { reads, ...rest } = row;
+    const readAt = reads?.[0]?.readAt ?? null;
+    return {
+      ...rest,
+      readStatus: readAt ? ReadStatus.READ : ReadStatus.UNREAD,
+      readAt,
+      alreadyRead: readAt !== null,
+    };
+  }
+
+  private readInclude(adminUserId: number) {
+    return { reads: { where: { adminUserId }, select: { readAt: true } } } as const;
   }
 
   /** 发布方可触达的附属商家范围；附属 / 店员 → 403 */
@@ -150,59 +175,91 @@ export class NotificationService {
     const mine = await this.receiverWhere(user);
     if (!mine) return { list: [], total: 0, page, pageSize, unreadCount: 0 };
 
+    const uid = user.sub;
     const where: Prisma.NotificationWhereInput = {
       AND: [
         mine,
-        {
-          ...(query.readStatus ? { readStatus: query.readStatus } : {}),
-          ...(query.type ? { type: query.type } : {}),
-        },
+        query.readStatus === ReadStatus.UNREAD
+          ? { reads: { none: { adminUserId: uid } } }
+          : query.readStatus === ReadStatus.READ
+            ? { reads: { some: { adminUserId: uid } } }
+            : {},
+        query.type ? { type: query.type } : {},
       ],
     };
-    const [list, total, unreadCount] = await Promise.all([
+
+    const [rows, total, unreadCount] = await Promise.all([
       this.prisma.notification.findMany({
         where,
         orderBy: { id: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
+        include: this.readInclude(uid),
       }),
       this.prisma.notification.count({ where }),
-      this.prisma.notification.count({ where: { AND: [mine, { readStatus: ReadStatus.UNREAD }] } }),
+      this.prisma.notification.count({ where: this.unreadWhere(mine, uid) }),
     ]);
-    return { list, total, page, pageSize, unreadCount };
+
+    return { list: rows.map((r) => this.withReadState(r)), total, page, pageSize, unreadCount };
+  }
+
+  /** 未读数（供工作台等复用，口径唯一） */
+  async getUnreadCount(user: JwtPayload): Promise<number> {
+    const mine = await this.receiverWhere(user);
+    if (!mine) return 0;
+    return this.prisma.notification.count({ where: this.unreadWhere(mine, user.sub) });
   }
 
   async unreadCount(user: JwtPayload) {
-    const mine = await this.receiverWhere(user);
-    if (!mine) return { unreadCount: 0 };
-    const unreadCount = await this.prisma.notification.count({
-      where: { AND: [mine, { readStatus: ReadStatus.UNREAD }] },
-    });
-    return { unreadCount };
+    return { unreadCount: await this.getUnreadCount(user) };
   }
 
-  /** 已读幂等：重复标记返回 200 + alreadyRead=true */
+  /** 已读幂等：重复标记返回 200 + alreadyRead=true；不在接收范围 → 404 */
   async markRead(id: number, user: JwtPayload) {
     const mine = await this.receiverWhere(user);
     if (!mine) throw BizException.notFound(ReasonCode.RESOURCE_NOT_FOUND, '通知不存在');
+    const uid = user.sub;
 
-    const { count } = await this.prisma.notification.updateMany({
-      where: { AND: [mine, { id, readStatus: ReadStatus.UNREAD }] },
-      data: { readStatus: ReadStatus.READ, readAt: new Date() },
+    const exists = await this.prisma.notification.findFirst({
+      where: { AND: [mine, { id }] },
+      select: { id: true },
     });
-    const row = await this.prisma.notification.findFirst({ where: { AND: [mine, { id }] } });
-    if (!row) throw BizException.notFound(ReasonCode.RESOURCE_NOT_FOUND, '通知不存在');
-    return { ...row, alreadyRead: count === 0 };
+    if (!exists) throw BizException.notFound(ReasonCode.RESOURCE_NOT_FOUND, '通知不存在');
+
+    const { count } = await this.prisma.notificationRead.createMany({
+      data: [{ notificationId: id, adminUserId: uid }],
+      skipDuplicates: true,
+    });
+
+    const row = await this.prisma.notification.findUniqueOrThrow({
+      where: { id },
+      include: this.readInclude(uid),
+    });
+    return { ...this.withReadState(row), alreadyRead: count === 0 };
   }
 
   async markAllRead(user: JwtPayload) {
     const mine = await this.receiverWhere(user);
     if (!mine) return { updated: 0 };
-    const { count } = await this.prisma.notification.updateMany({
-      where: { AND: [mine, { readStatus: ReadStatus.UNREAD }] },
-      data: { readStatus: ReadStatus.READ, readAt: new Date() },
+    const uid = user.sub;
+
+    const targets = await this.prisma.notification.findMany({
+      where: this.unreadWhere(mine, uid),
+      select: { id: true },
+      orderBy: { id: 'asc' },
     });
-    return { updated: count };
+    if (!targets.length) return { updated: 0 };
+
+    let updated = 0;
+    const CHUNK = 500;
+    for (let i = 0; i < targets.length; i += CHUNK) {
+      const { count } = await this.prisma.notificationRead.createMany({
+        data: targets.slice(i, i + CHUNK).map((t) => ({ notificationId: t.id, adminUserId: uid })),
+        skipDuplicates: true,
+      });
+      updated += count;
+    }
+    return { updated };
   }
 
   // ---------------------------------------------------------------- 发布侧
@@ -216,6 +273,8 @@ export class NotificationService {
 
     const type = dto.type ?? NotificationType.SYSTEM;
     const level = dto.level ?? NotifyLevel.NORMAL;
+    // 一次发送 = 一个批次；「全部发送」展开的 N 行共享它，「我发过的通知」据此聚合
+    const sendBatchId = randomUUID();
 
     return this.prisma.$transaction(async (tx) => {
       const { count } = await tx.notification.createMany({
@@ -226,6 +285,8 @@ export class NotificationService {
           level,
           title: dto.title,
           content: dto.content,
+          senderId: user.sub,
+          sendBatchId,
         })),
       });
 
@@ -237,14 +298,88 @@ export class NotificationService {
           module: 'notification',
           action: 'notification:send',
           targetType: 'notification',
-          after: { targetType: dto.targetType, receiverType, receiverIds, count, type, level, title: dto.title },
+          after: {
+            targetType: dto.targetType,
+            receiverType,
+            receiverIds,
+            count,
+            type,
+            level,
+            title: dto.title,
+            sendBatchId,
+          },
           ip,
           userAgent: ua,
         },
         tx,
       );
 
-      return { count, receiverType, receiverIds, type, level, title: dto.title };
+      return { count, receiverType, receiverIds, type, level, title: dto.title, sendBatchId };
     });
+  }
+
+  /**
+   * 我发过的通知（按发送批次聚合，一次发送一行）
+   *
+   * 用 `sendBatchId` 而非「标题 + 秒级时间」聚合：后者会把同一秒内的两次同名发送误合并成一条。
+   */
+  async listSent(query: QuerySentNotificationDto, user: JwtPayload) {
+    await this.senderMerchantScope(user); // 仅平台/主体可发布 → 也仅其可查「我发过的」
+
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
+
+    const conds: Prisma.Sql[] = [Prisma.sql`senderId = ${user.sub}`, Prisma.sql`sendBatchId IS NOT NULL`];
+    if (query.type) conds.push(Prisma.sql`type = ${query.type}`);
+    if (query.keyword) conds.push(Prisma.sql`title LIKE ${`%${query.keyword}%`}`);
+    const whereSql = Prisma.join(conds, ' AND ');
+
+    const [totalRow] = await this.prisma.$queryRaw<Array<{ total: bigint }>>(
+      Prisma.sql`SELECT COUNT(DISTINCT sendBatchId) AS total FROM notifications WHERE ${whereSql}`,
+    );
+
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        sendBatchId: string;
+        title: string;
+        content: string;
+        type: string;
+        level: string;
+        createdAt: Date;
+        receiverCount: bigint;
+        receiverTypeCount: bigint;
+      }>
+    >(
+      Prisma.sql`SELECT sendBatchId,
+                        MIN(title)    AS title,
+                        MIN(content)  AS content,
+                        MIN(type)     AS type,
+                        MIN(level)    AS level,
+                        MIN(createdAt) AS createdAt,
+                        COUNT(*)                   AS receiverCount,
+                        COUNT(DISTINCT receiverType) AS receiverTypeCount
+                 FROM notifications
+                 WHERE ${whereSql}
+                 GROUP BY sendBatchId
+                 ORDER BY MIN(createdAt) DESC, sendBatchId DESC
+                 LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}`,
+    );
+
+    return {
+      // mysql 驱动把 COUNT 返回为 BigInt，出参前统一转 number（否则 JSON 序列化 500）
+      list: rows.map((r) => ({
+        sendBatchId: r.sendBatchId,
+        title: r.title,
+        content: r.content,
+        type: r.type,
+        level: r.level,
+        createdAt: r.createdAt,
+        receiverCount: Number(r.receiverCount),
+        receiverTypeCount: Number(r.receiverTypeCount),
+      })),
+      total: Number(totalRow?.total ?? 0),
+      page,
+      pageSize,
+    };
   }
 }

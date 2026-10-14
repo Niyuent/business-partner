@@ -1,0 +1,52 @@
+S5.4-B1 站内信（每人各自已读 + 发送人/批次 + 我发过的 + 工作台口径统一）· 验收用例（HTTP 实测）
+生成时间: 2026-10-15
+脚本: docs/archive/test-scripts/tmp-s54b1-cases.mjs
+环境: 主体=1 本店=101 本商家=2 别家=3 本店最早管理员=4 可发门店数=3
+
+———— 每人各自已读（同一门店通知，店员/附属互不影响） ————
+✅ [A1] 主体→指定门店发布成功（写 senderId + sendBatchId） :: HTTP=201 batch=918b5ef4-4514-426c-b4f0-271ad56e2b2e
+✅ [A2] 发布人落库（senderId = admin 的账号 id） :: senderId=1
+✅ [A3] 店员标记已读 → 200 且 alreadyRead=false :: HTTP=200 alreadyRead=false
+✅ [A4] 店员未读数 -1 :: 1 → 0
+✅ [A5] 附属未读数**不受影响**（各自已读） :: 1 → 1
+✅ [A6] 店员 UNREAD 列表已不含该条；附属 UNREAD 列表仍含该条 :: clerk含=false sub01含=true
+✅ [A7] notification_reads 仅 1 条（店员） :: count=1
+✅ [A8] 附属也标记已读 → 200 且各自一行（共 2 条） :: HTTP=200 reads=2
+
+———— 重复已读幂等 ————
+✅ [B1] 重复标记 → 200 + alreadyRead=true，且不新增记录 :: HTTP=200 alreadyRead=true reads=2
+✅ [B2] 全部已读返回实际更新条数（≥0 的整数） :: HTTP=200 updated=0
+✅ [B3] 全部已读后店员未读数为 0 :: unread=0
+
+———— 越权 / 404 ————
+✅ [C1] 标记别家通知 → 404（不泄露存在性） :: HTTP=404 RESOURCE_NOT_FOUND
+✅ [C2] 别家通知不出现在自己的列表 :: found=false
+✅ [C3] 平台账号无接收身份 → 列表空、未读数 0 :: HTTP=200 unread=0
+
+———— 我发过的通知（sent） ————
+✅ [S1] ALL_STORES 展开 N 行但 sent 只返回 1 条批次 :: HTTP=201 groups=1 展开行数=3
+✅ [S2] 批次 receiverCount = 展开行数 :: receiverCount=3 期望=3
+✅ [S3] 同一秒内两次同标题发送 → 返回 2 条（不误合并） :: groups=2
+✅ [S4] 两条批次号不同 :: batch0=aba90ba8-80bd-4662-a461-74f07ae6f1b8 batch1=1bd57137-9367-451d-8875-7f046d420828
+✅ [S5] sent 只返回自己发的（admin 不含 platform 的） :: admin批次=5 platform批次=0
+✅ [S6] 附属访问 sent → 403（无 notification:send） :: HTTP=403 PERMISSION_DENIED
+✅ [S7] sent 关键词筛选命中 1 条 :: HTTP=200 n=1
+
+———— 工作台未读数口径统一 ————
+✅ [W1] admin：工作台 unreadNotifications === 通知未读数 :: todo=1 list=1
+✅ [W2] sub01：工作台口径同样一致 :: todo=6 list=6
+
+———— 迁移回填 / 幂等 ————
+✅ [M1] 历史 READ 通知回填到「接收方最早管理员」(#4) :: before=0 read.owner=4/2026-10-15
+✅ [M2] 迁移可重复执行（第二次不产生重复行） :: reads=1
+✅ [M3] 每次执行写一条回填审计（含 成功/跳过 计数） :: audit=3
+✅ [M4] 迁移结构落地（senderId/sendBatchId 存在） :: cols=sendBatchId,senderId
+✅ [M5] readStatus 保留未删（deprecated，便于回滚） :: col=readStatus
+
+===== S5.4-B1 结果：28 通过 / 0 失败 =====
+
+说明:
+- 全量回归（npm run regression，含 S5.4-B1）13 个脚本合计 286/0（证据 docs/screenshots/regression-full.txt）。
+- 「同一秒内两次同标题发送 → 2 条」由 sendBatchId（每次发送一个 UUID）保证；
+  若按「标题 + 秒级时间」分组，这两条会被误合并为 1 条（见交付说明）。
+- S5.4-A 用例有 2 条断言因本阶段语义变更而同步更新（S9 改为各自已读、S11 改为断言 notification_reads）。

@@ -97,3 +97,32 @@ export class QueryNotificationDto {
   @IsEnum(NotificationType)
   type?: NotificationType;
 }
+
+/** 「我发过的通知」查询（S5.4-B1）：按发送批次聚合，一次发送返回一条 */
+export class QuerySentNotificationDto {
+  @ApiPropertyOptional({ default: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({ default: 20, maximum: 100 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  pageSize?: number = 20;
+
+  @ApiPropertyOptional({ enum: NotificationType })
+  @IsOptional()
+  @IsEnum(NotificationType)
+  type?: NotificationType;
+
+  @ApiPropertyOptional({ description: '标题模糊搜索' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  keyword?: string;
+}

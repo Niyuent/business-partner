@@ -25,8 +25,9 @@ const SCRIPTS = [
   ['tmp-s52-cases', 'S5.2 用户管理'],
   ['tmp-s53-cases', 'S5.3 门店变更申请'],
   ['tmp-s54a-cases', 'S5.4-A 站内信后端'],
-  // S5.4-B（通知：门店已读共享修复 + sender_id + 已发通知 + 前端）落地后在此追加：
-  // ['tmp-s54b-cases', 'S5.4-B 通知中心'],
+  ['tmp-s54b1-cases', 'S5.4-B1 通知每人各自已读 + 我发过的 + 口径统一'],
+  // S5.4-B2（前端：通知中心 + 铃铛）落地后在此追加：
+  // ['tmp-s54b2-cases', 'S5.4-B2 通知中心前端'],
 ];
 
 const summaryOf = (out) =>

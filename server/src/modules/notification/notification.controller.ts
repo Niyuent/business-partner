@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Permissions } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtPayload } from '../auth/jwt-payload';
-import { QueryNotificationDto, SendNotificationDto } from './dto/notification.dto';
+import { QueryNotificationDto, QuerySentNotificationDto, SendNotificationDto } from './dto/notification.dto';
 import { NotificationService } from './notification.service';
 
 /**
@@ -33,6 +33,16 @@ export class NotificationController {
   @ApiOperation({ summary: '我的未读通知数' })
   unreadCount(@CurrentUser() user: JwtPayload) {
     return this.service.unreadCount(user);
+  }
+
+  @Get('sent')
+  @Permissions('notification:send')
+  @ApiOperation({
+    summary: '我发过的通知（按发送批次聚合，一次发送 = 一条；权限 notification:send）',
+    description: '「全部发送」展开的 N 行会聚合成 1 条并返回 receiverCount；同一秒内的两次同名发送不会被误合并。',
+  })
+  listSent(@Query() query: QuerySentNotificationDto, @CurrentUser() user: JwtPayload) {
+    return this.service.listSent(query, user);
   }
 
   @Patch('read-all')
