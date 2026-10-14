@@ -1,0 +1,331 @@
+{
+  "title": "商盟系统 15 天冲刺",
+  "startDate": "2026-10-15",
+  "endDate": "2026-10-29",
+  "lanes": [
+    {
+      "id": "fe",
+      "name": "前端线",
+      "marker": "1"
+    },
+    {
+      "id": "be",
+      "name": "S7 后端线",
+      "marker": "2"
+    },
+    {
+      "id": "pay",
+      "name": "S8 支付线",
+      "marker": "3"
+    },
+    {
+      "id": "ai",
+      "name": "AI 线",
+      "marker": "4"
+    }
+  ],
+  "columns": [
+    {
+      "id": "todo",
+      "name": "待办"
+    },
+    {
+      "id": "doing",
+      "name": "进行中"
+    },
+    {
+      "id": "blocked",
+      "name": "阻塞"
+    },
+    {
+      "id": "done",
+      "name": "已完成"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "FE-D1",
+      "lane": "fe",
+      "day": "D1",
+      "name": "P2 修复（S4.3 视觉 / Network 截图遗留）",
+      "owner": "澄鸡",
+      "due": "2026-10-17",
+      "column": "doing",
+      "note": "10-15 复核：本仓库与 D:\\My game\\商盟系统 均未见 S4.3 截图产物，移回进行中并重新排期"
+    },
+    {
+      "id": "FE-D2",
+      "lane": "fe",
+      "day": "D2",
+      "name": "通知中心前端（主体发信 + 附属收件箱）",
+      "owner": "澄鸡",
+      "due": "2026-10-16",
+      "column": "todo"
+    },
+    {
+      "id": "FE-D3",
+      "lane": "fe",
+      "day": "D3",
+      "name": "附属侧页面补齐（orders / redemptions / purchases / settlements）",
+      "owner": "澄鸡",
+      "due": "2026-10-17",
+      "column": "todo"
+    },
+    {
+      "id": "FE-D4",
+      "lane": "fe",
+      "day": "D4",
+      "name": "SSE 前端接入（实时弹窗 + 未读角标）",
+      "owner": "澄鸡",
+      "due": "2026-10-18",
+      "column": "todo"
+    },
+    {
+      "id": "FE-D7",
+      "lane": "fe",
+      "day": "D7",
+      "name": "H5 简版联调（关 mock 全页面走真实接口）",
+      "owner": "澄鸡",
+      "due": "2026-10-21",
+      "column": "todo"
+    },
+    {
+      "id": "FE-D9",
+      "lane": "fe",
+      "day": "D9",
+      "name": "待认领池前端（按手机号录单入口）",
+      "owner": "澄鸡",
+      "due": "2026-10-23",
+      "column": "todo"
+    },
+    {
+      "id": "FE-D12",
+      "lane": "fe",
+      "day": "D12",
+      "name": "联调缺陷修复 + 回归截图",
+      "owner": "澄鸡",
+      "due": "2026-10-26",
+      "column": "todo"
+    },
+    {
+      "id": "FE-D14",
+      "lane": "fe",
+      "day": "D14",
+      "name": "人工验收冲刺（视觉 + 证据截图）",
+      "owner": "澄鸡",
+      "due": "2026-10-28",
+      "column": "todo"
+    },
+    {
+      "id": "BE-D1",
+      "lane": "be",
+      "day": "D1",
+      "name": "S4.3 报表回归脚本补齐（并入 npm run regression）",
+      "owner": "Kimi",
+      "due": "2026-10-16",
+      "column": "doing",
+      "note": "10-15 复核：regression.mjs 无 S4.3 条目、docs/archive/test-scripts 无 *s43* 脚本，移回进行中并重新排期"
+    },
+    {
+      "id": "BE-D2",
+      "lane": "be",
+      "day": "D2",
+      "name": "通知模块设计评审（站内信 + SSE 触发点）",
+      "owner": "Kimi",
+      "due": "2026-10-16",
+      "column": "todo"
+    },
+    {
+      "id": "BE-D4",
+      "lane": "be",
+      "day": "D4",
+      "name": "站内信表（notifications 表 + 迁移 + seed）",
+      "owner": "Kimi",
+      "due": "2026-10-18",
+      "column": "todo"
+    },
+    {
+      "id": "BE-D5",
+      "lane": "be",
+      "day": "D5",
+      "name": "SSE 推送（sse 模块 + 事件发布）",
+      "owner": "Kimi",
+      "due": "2026-10-19",
+      "column": "todo"
+    },
+    {
+      "id": "BE-D6",
+      "lane": "be",
+      "day": "D6",
+      "name": "附属侧 API 补齐（scope 隔离 + 越权用例）",
+      "owner": "Kimi",
+      "due": "2026-10-20",
+      "column": "todo"
+    },
+    {
+      "id": "BE-D8",
+      "lane": "be",
+      "day": "D8",
+      "name": "待认领池后端（pending_records + 按手机号自动认领）",
+      "owner": "Kimi",
+      "due": "2026-10-22",
+      "column": "todo"
+    },
+    {
+      "id": "BE-D10",
+      "lane": "be",
+      "day": "D10",
+      "name": "全量回归（204+ 用例）+ S5.4 用例并入",
+      "owner": "Kimi",
+      "due": "2026-10-24",
+      "column": "todo"
+    },
+    {
+      "id": "BE-D11",
+      "lane": "be",
+      "day": "D11",
+      "name": "加固巡检（限流 / P2002 精确化 / 审计覆盖）",
+      "owner": "Kimi",
+      "due": "2026-10-25",
+      "column": "todo"
+    },
+    {
+      "id": "BE-D13",
+      "lane": "be",
+      "day": "D13",
+      "name": "联调支持 + 缺陷修复",
+      "owner": "Kimi",
+      "due": "2026-10-27",
+      "column": "todo"
+    },
+    {
+      "id": "BE-D15",
+      "lane": "be",
+      "day": "D15",
+      "name": "后端冻结封版",
+      "owner": "Kimi",
+      "due": "2026-10-29",
+      "column": "todo"
+    },
+    {
+      "id": "PAY-D3",
+      "lane": "pay",
+      "day": "D3",
+      "name": "微信支付调研与方案设计（支付即积分流程）",
+      "owner": "澄鸡",
+      "due": "2026-10-17",
+      "column": "todo"
+    },
+    {
+      "id": "PAY-D6",
+      "lane": "pay",
+      "day": "D6",
+      "name": "支付前置：unionid 打通 + C 端手机号自助绑定",
+      "owner": "澄鸡",
+      "due": "2026-10-20",
+      "column": "blocked",
+      "note": "阻塞：微信商户号资质审核中"
+    },
+    {
+      "id": "PAY-D9",
+      "lane": "pay",
+      "day": "D9",
+      "name": "支付模块骨架（下单 / 回调接口 + mock 环境）",
+      "owner": "澄鸡",
+      "due": "2026-10-23",
+      "column": "todo"
+    },
+    {
+      "id": "PAY-D12",
+      "lane": "pay",
+      "day": "D12",
+      "name": "支付即积分核心链路（回调 → FIFO 入账）",
+      "owner": "澄鸡",
+      "due": "2026-10-26",
+      "column": "todo"
+    },
+    {
+      "id": "PAY-D14",
+      "lane": "pay",
+      "day": "D14",
+      "name": "支付联调 + 对账",
+      "owner": "澄鸡",
+      "due": "2026-10-28",
+      "column": "todo"
+    },
+    {
+      "id": "PAY-D15",
+      "lane": "pay",
+      "day": "D15",
+      "name": "支付线验收",
+      "owner": "澄鸡",
+      "due": "2026-10-29",
+      "column": "todo"
+    },
+    {
+      "id": "AI-D1",
+      "lane": "ai",
+      "day": "D1",
+      "name": "冲刺看板搭建（Blueprint 看板 + 自动化规则）",
+      "owner": "Kimi",
+      "due": "2026-10-15",
+      "column": "done",
+      "completedAt": "2026-10-15"
+    },
+    {
+      "id": "AI-D2",
+      "lane": "ai",
+      "day": "D2",
+      "name": "站会摘要自动化联调",
+      "owner": "Kimi",
+      "due": "2026-10-16",
+      "column": "todo"
+    },
+    {
+      "id": "AI-D5",
+      "lane": "ai",
+      "day": "D5",
+      "name": "AI 生成 S5.4 / S6 API 回归用例草稿",
+      "owner": "Kimi",
+      "due": "2026-10-19",
+      "column": "todo"
+    },
+    {
+      "id": "AI-D8",
+      "lane": "ai",
+      "day": "D8",
+      "name": "AI 代码审查（scope / 权限双保险巡检）",
+      "owner": "Kimi",
+      "due": "2026-10-22",
+      "column": "todo"
+    },
+    {
+      "id": "AI-D10",
+      "lane": "ai",
+      "day": "D10",
+      "name": "验收清单自动核对（docs/06 状态同步）",
+      "owner": "Kimi",
+      "due": "2026-10-24",
+      "column": "todo"
+    },
+    {
+      "id": "AI-D13",
+      "lane": "ai",
+      "day": "D13",
+      "name": "冲刺复盘文档生成",
+      "owner": "Kimi",
+      "due": "2026-10-27",
+      "column": "todo"
+    },
+    {
+      "id": "AI-D15",
+      "lane": "ai",
+      "day": "D15",
+      "name": "归档 + 00-AI-Context 刷新",
+      "owner": "Kimi",
+      "due": "2026-10-29",
+      "column": "todo"
+    }
+  ],
+  "updatedAt": "2026-10-15T18:00:00"
+}
