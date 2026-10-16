@@ -1,0 +1,65 @@
+S5.4-B2 星系视图 · 验收证据（Network dump + 性能 + 交互）
+生成时间: 2026-10-17
+工具: agent-browser（Chromium 155.0.8059.84）· 视口 1440x900 · 账号 admin（主体商家）
+
+────────────────────────────────────────────────────────
+一、Network dump（真实请求，无 mock）
+刷新 /dashboard 抓到的请求（节选）：
+  GET http://localhost/dashboard                          (Document)  200
+  GET http://localhost/assets/dashboard-DaoBFaG3.js       (Script)    200
+  GET http://localhost/api/v1/auth/profile                (XHR)       200
+  GET http://localhost/api/v1/dashboard/stats             (XHR)       200
+  GET http://localhost/api/v1/dashboard/trend?days=7      (XHR)       200
+  GET http://localhost/api/v1/dashboard/distribution      (XHR)       200
+  GET http://localhost/api/v1/dashboard/top-merchants     (XHR)       200
+  GET http://localhost/api/v1/dashboard/galaxy            (XHR)       200
+→ 全部走 /api/v1/*，无任何 mock 响应。
+完整 HAR（110 条请求）：s54b2-galaxy-network.har
+
+────────────────────────────────────────────────────────
+二、首屏加载 < 2 秒（Performance API）
+  FCP                = 844 ms
+  DOMContentLoaded   = 221 ms
+  load               = 230 ms
+  接口耗时：stats 180ms / trend 179ms / distribution 68ms / top-merchants 67ms / galaxy 18ms
+  判定：✅ 首屏 < 2 秒
+
+────────────────────────────────────────────────────────
+三、20 节点帧率（临时造 17 个附属商家 → 21 节点，验收后已还原）
+  idle 3s            : 405 帧 / 3012ms = 134.5 fps
+  含鼠标交互        : 400 帧 / 2597ms = 154 fps，最长帧 210.3ms（仅 1 帧 > 33ms）
+  说明：headless Chromium 未受 vsync 限制，绝对 fps 数值偏高；唯一的 210ms 尖峰
+        出现在 daemon 重启导致的图表重初始化（力导向布局首算），非逐帧渲染抖动。
+  判定：✅ 20+ 节点流畅渲染，无持续掉帧
+
+────────────────────────────────────────────────────────
+四、点击跳转
+  点击行星（页面坐标 763,487）→ URL 变为 http://localhost/main/merchants/2 ✅
+  截图：s54b2-galaxy-03-click-before.png（点击前）/ s54b2-galaxy-04-click-after.png（跳转后）
+
+────────────────────────────────────────────────────────
+五、视图切换持久化（localStorage key = dashboard:view，默认星系视图）
+  点击「数据视图」→ localStorage['dashboard:view'] = "data" ✅
+  刷新页面后仍为数据视图 ✅
+  切回「星系视图」→ localStorage['dashboard:view'] = "galaxy" ✅
+  截图：05-view-switched / 06-view-persisted-after-reload / 07-back-to-galaxy
+
+  ⚠️ 过程中发现并修复一个真实 bug：
+     最初用 el-radio-group 的 @change 做持久化，实测该事件在当前 Element Plus
+     版本下未触发（localStorage 始终为 null）。已改为 watch(viewMode)，
+     覆盖 radio / 按钮 / 编程式赋值等所有改法。
+
+────────────────────────────────────────────────────────
+六、截图清单
+  01-first-load.png                 首屏（星系视图，21 节点 = 1 中心 + 20 行星）
+  03-click-before.png               点击行星前
+  04-click-after.png                跳转到 /main/merchants/2 后
+  05-view-switched.png              切换到数据视图
+  06-view-persisted-after-reload.png 刷新后仍是数据视图（持久化证明）
+  07-back-to-galaxy.png             切回星系视图
+
+────────────────────────────────────────────────────────
+七、角色差异化（API 层实测）
+  admin（主体）  GET /dashboard/galaxy → 200，center + 3 planets + flows
+  sub01（附属）  GET /dashboard/galaxy → 403 FORBIDDEN_SCOPE（前端降级数据视图）
+  clerk01（店员）GET /dashboard/galaxy → 403 FORBIDDEN_SCOPE（前端降级数据视图）
