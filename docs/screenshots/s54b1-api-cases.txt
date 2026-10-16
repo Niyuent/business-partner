@@ -1,5 +1,5 @@
 S5.4-B1 站内信（每人各自已读 + 发送人/批次 + 我发过的 + 工作台口径统一）· 验收用例（HTTP 实测）
-生成时间: 2026-10-15
+生成时间: 2026-10-15（2026-10-17 补充 targets 边界用例，共 34 条）
 脚本: docs/archive/test-scripts/tmp-s54b1-cases.mjs
 环境: 主体=1 本店=101 本商家=2 别家=3 本店最早管理员=4 可发门店数=3
 
@@ -43,10 +43,19 @@ S5.4-B1 站内信（每人各自已读 + 发送人/批次 + 我发过的 + 工�
 ✅ [M4] 迁移结构落地（senderId/sendBatchId 存在） :: cols=sendBatchId,senderId
 ✅ [M5] readStatus 保留未删（deprecated，便于回滚） :: col=readStatus
 
-===== S5.4-B1 结果：28 通过 / 0 失败 =====
+———— targets 可选发布目标（2026-10-17 补充） ————
+✅ [T7]  targetss 返回 { merchants, stores }（基线 2 商家 / 3 门店） :: HTTP=200 merchants=[2,3] stores=[101,102,201]
+✅ [T8]  SUSPENDED 商家不出现在 targets（其门店仍 OPEN） :: merchants=[3] 门店状态=101=OPEN,102=OPEN
+✅ [T9]  SUSPENDED 商家旗下门店不出现在 targets（只含 201） :: stores=[201]
+✅ [T10] 一致性：停用商家与其门店**同时**被排除（不会一个保留一个排除） :: merchant2=false store101=false store102=false
+✅ [T11a] merchant 2 状态已恢复 :: APPROVED / 原 APPROVED
+✅ [T11] 双向一致性：targets 内逐个 POST 均 201；targets 外（MAIN 主体 id=1）POST 403 :: M2→201 M3→201 S101→201 S102→201 S201→201 | BAD→403/FORBIDDEN_SCOPE
+
+===== S5.4-B1 结果：34 通过 / 0 失败 =====
 
 说明:
-- 全量回归（npm run regression，含 S5.4-B1）13 个脚本合计 286/0（证据 docs/screenshots/regression-full.txt）。
+- 全量回归（npm run regression，含 S5.4-B1）13 个脚本合计 292/0（证据 docs/screenshots/regression-full.txt）。
 - 「同一秒内两次同标题发送 → 2 条」由 sendBatchId（每次发送一个 UUID）保证；
-  若按「标题 + 秒级时间」分组，这两条会被误合并为 1 条（见交付说明）。
-- S5.4-A 用例有 2 条断言因本阶段语义变更而同步更新（S9 改为各自已读、S11 改为断言 notification_reads）。
+  若按「标题 + 秒级时间」分组，这两条会被误合并为 1 条。
+- S5.4-A 用例有 2 条断言因本阶段语义变更而同步更新（S9 改为各自已读、S11/F14 改为断言 notification_reads）。
+- targets 无分页：商家/门店各 take 2000，命中即服务端 warn（见 docs/03）。

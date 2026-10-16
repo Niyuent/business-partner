@@ -126,3 +126,15 @@ export class QuerySentNotificationDto {
   @MaxLength(100)
   keyword?: string;
 }
+
+/**
+ * 可选发布目标（S5.4-B2）
+ *
+ * 与 `POST /notifications` 共用 `senderMerchantScope`：
+ *  - `ALL_MERCHANTS` 可发范围 === `merchants`
+ *  - `ALL_STORES` 可发范围 === `stores`（每项带 `merchantId`，便于前端按商家分组）
+ */
+export interface NotificationTargets {
+  merchants: Array<{ id: number; name: string; code: string | null }>;
+  stores: Array<{ id: number; name: string; code: string | null; merchantId: number }>;
+}

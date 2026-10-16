@@ -224,8 +224,60 @@ log('———— 迁移回填 / 幂等 ————');
   ok('M5', 'readStatus 保留未删（deprecated，便于回滚）', legacy === 'readStatus', `col=${legacy}`);
 }
 
+// ============ 7. targets 可选发布目标（边界） ============
+log('');
+log('———— targets 可选发布目标（边界） ————');
+const origM2 = scalar(`SELECT status FROM merchants WHERE id=2`);
+{
+  const t = await call('GET', 'notifications/targets', A);
+  const ids = (t.data?.merchants ?? []).map((m) => m.id);
+  const sids = (t.data?.stores ?? []).map((s) => s.id);
+  ok('T7', 'targets 返回 { merchants, stores }（基线 2 商家 / 3 门店）', t.status === 200 && ids.length === 2 && sids.length === 3, `HTTP=${t.status} merchants=[${ids}] stores=[${sids}]`);
+}
+{
+  // merchant 2 停用，但其门店 101/102 状态仍为 OPEN —— 验证「商家维度」同时过滤掉商家与门店
+  sql(`UPDATE merchants SET status='SUSPENDED' WHERE id=2;`);
+  const storeStatus = scalar(`SELECT GROUP_CONCAT(CONCAT(id,'=',status)) FROM stores WHERE merchantId=2`);
+  const t = await call('GET', 'notifications/targets', A);
+  const ids = (t.data?.merchants ?? []).map((m) => m.id);
+  const sids = (t.data?.stores ?? []).map((s) => s.id);
+  ok('T8', 'SUSPENDED 商家不出现在 targets（其门店仍 OPEN）', !ids.includes(2) && ids.includes(3), `merchants=[${ids}] 门店状态=${storeStatus}`);
+  ok('T9', 'SUSPENDED 商家旗下门店不出现在 targets（只含 201）', !sids.includes(101) && !sids.includes(102) && sids.includes(201), `stores=[${sids}]`);
+  ok('T10', '一致性：停用商家与其门店**同时**被排除（不会一个保留、一个排除）',
+    !ids.includes(2) && !sids.includes(101) && !sids.includes(102),
+    `merchant2=${ids.includes(2)} store101=${sids.includes(101)} store102=${sids.includes(102)}`);
+}
+{
+  sql(`UPDATE merchants SET status='${origM2}' WHERE id=2;`);
+  const now = scalar(`SELECT status FROM merchants WHERE id=2`);
+  ok('T11a', `merchant 2 状态已恢复（${now}）`, now === origM2, `${now} / 原 ${origM2}`);
+}
+{
+  // 双向一致性：targets 内逐个可发；targets 外必被拒
+  const t = await call('GET', 'notifications/targets', A);
+  const ms = t.data?.merchants ?? [];
+  const ss = t.data?.stores ?? [];
+  let allOk = true;
+  const detail = [];
+  for (const m of ms) {
+    const r = await call('POST', 'notifications', A, { targetType: 'MERCHANT', targetIds: [m.id], title: T('tgt') + '-M' + m.id, content: 'targets 一致性正向' });
+    detail.push(`M${m.id}->${r.status}`);
+    if (r.status !== 201) allOk = false;
+  }
+  for (const s of ss) {
+    const r = await call('POST', 'notifications', A, { targetType: 'STORE', targetIds: [s.id], title: T('tgt') + '-S' + s.id, content: 'targets 一致性正向' });
+    detail.push(`S${s.id}->${r.status}`);
+    if (r.status !== 201) allOk = false;
+  }
+  const bad = await call('POST', 'notifications', A, { targetType: 'MERCHANT', targetIds: [1], title: T('tgt') + '-BAD', content: 'targets 外越权' });
+  ok('T11', '双向一致性：targets 内逐个 POST 均 201；targets 外（MAIN 主体 id=1）POST 403',
+    allOk && bad.status === 403 && bad.reason === 'FORBIDDEN_SCOPE',
+    `${detail.join(' ')} | BAD->${bad.status}/${bad.reason}`);
+}
+
 // ============ 清理 ============
 sql(`DELETE FROM notification_reads WHERE notificationId=880001; DELETE FROM notifications WHERE id=880001;`);
+sql(`UPDATE merchants SET status='${origM2}' WHERE id=2;`);
 cleanup();
 log('  （已清理测试通知、阅读记录与回填用例数据）');
 

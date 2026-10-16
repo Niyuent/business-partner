@@ -219,6 +219,10 @@ S3.4 将实现：`GET /orders/*`、`POST /orders`（补录订单调用 `/points/
 | POST | `/notifications` | 发布（主体 → 指定商家/门店/全部） **[MAIN]** |
 | PATCH | `/notifications/:id/read` | 标记已读 |
 | PATCH | `/notifications/read-all` | 全部已读 |
+| GET | `/notifications/targets` | 可选发布目标（本主体可发布的附属商家 + 其营业中门店）`{ merchants, stores }` **[MAIN]** |
+
+> **`GET /notifications/targets` 无分页**：商家与门店各取**上限 2000**（`take: 2000`）。命中上限时服务端打 warn「targets 超过 2000，需要分页」并返回截断结果；若单主体规模可能超过 2000，需先改为游标/分页方案。
+> 该接口与 `POST /notifications` **共用 `senderMerchantScope`**，保证「前端选得到的 = 后端允发的」（见验收用例 T8–T11）。
 
 ## 14. 日志与上传
 

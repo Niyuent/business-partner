@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   MerchantStatus,
   MerchantType,
@@ -33,6 +33,8 @@ import { QueryNotificationDto, QuerySentNotificationDto, SendNotificationDto } f
  */
 @Injectable()
 export class NotificationService {
+  private readonly logger = new Logger('Notification');
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -381,5 +383,42 @@ export class NotificationService {
       page,
       pageSize,
     };
+  }
+
+  /**
+   * 可选发布目标（S5.4-B2）
+   *
+   * 与 `POST /notifications` **共用** `senderMerchantScope`，保证「可选项」与「发送校验」口径完全一致：
+   *  - targets 返回的每个商家 / 门店，逐个 POST 都必须成功（不会「前端显示可发 → 后端拒绝」）；
+   *  - 未返回的目标（非直属附属 / 未审核 / 已停业），POST 必定 403。
+   *
+   * 返回 `{ merchants: [{id,name,code}], stores: [{id,name,code,merchantId}] }`，
+   * stores 带 `merchantId` 便于前端按商家分组展示。
+   */
+  async targets(user: JwtPayload) {
+    const scope = await this.senderMerchantScope(user);
+    // 上限保护：targets **不分页**（见 docs/03），商家/门店各取上限 2000，命中即告警
+    const LIMIT = 2000;
+    const [merchants, stores] = await Promise.all([
+      this.prisma.merchant.findMany({
+        where: { AND: [scope, { status: MerchantStatus.APPROVED }] },
+        select: { id: true, name: true, code: true },
+        orderBy: { id: 'asc' },
+        take: LIMIT,
+      }),
+      this.prisma.store.findMany({
+        where: {
+          status: StoreStatus.OPEN,
+          merchant: { AND: [scope, { status: MerchantStatus.APPROVED }] },
+        },
+        select: { id: true, name: true, code: true, merchantId: true },
+        orderBy: { id: 'asc' },
+        take: LIMIT,
+      }),
+    ]);
+    if (merchants.length >= LIMIT || stores.length >= LIMIT) {
+      this.logger.warn(`targets 超过 ${LIMIT}，需要分页（merchants=${merchants.length} stores=${stores.length}）`);
+    }
+    return { merchants, stores };
   }
 }

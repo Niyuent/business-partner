@@ -45,6 +45,17 @@ export class NotificationController {
     return this.service.listSent(query, user);
   }
 
+  @Get('targets')
+  @Permissions('notification:send')
+  @ApiOperation({
+    summary: '可选发布目标（本主体可发布的附属商家 + 其营业中门店）',
+    description:
+      '与 POST /notifications **共用同一套 scope 断言**，保证「前端选得到的 = 后端允发的」。返回 { merchants: [...], stores: [...] }，stores 带 merchantId 便于分组展示。',
+  })
+  targets(@CurrentUser() user: JwtPayload) {
+    return this.service.targets(user);
+  }
+
   @Patch('read-all')
   @Permissions('notification:view')
   @ApiOperation({ summary: '我的通知全部标记已读（返回实际更新条数）' })
