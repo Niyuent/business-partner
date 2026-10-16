@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MerchantType, PointTxnType, Prisma } from '@prisma/client';
+import { BizException, ReasonCode } from '../../common/exceptions/biz.exception';
 import { toCsv } from '../../common/utils/csv.util';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { JwtPayload } from '../auth/jwt-payload';
@@ -662,5 +663,93 @@ export class ReportService {
       name: String(r.name),
       amount: Number(r.amount),
     }));
+  }
+
+  // ---------------------------------------------------------------- 7. 星系视图
+
+  /**
+   * 星系视图（`GET /dashboard/galaxy`）
+   *
+   * - **平台 / 主体**：全平台星系 —— 中心 = 平台 / 主体商家，行星 = 附属商家
+   *   （`symbolSize` ∝ 本月交易额，颜色 = 商家状态）；
+   * - **附属 / 店员**：**403**（没有全平台视角），前端据此自动降级为数据视图。
+   *
+   * `flows` = 「中心 → 行星」的交易额边，为第二期粒子流动画预留数据，本版不渲染动画。
+   * 聚合一律走 DB（`groupBy` / `aggregate`），不在应用层循环。
+   */
+  async galaxy(user: JwtPayload) {
+    const { merchantId } = await this.scope(user);
+    if (merchantId) {
+      throw BizException.forbidden(ReasonCode.FORBIDDEN_SCOPE, '星系视图仅主体/平台可用');
+    }
+
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const isPlatform = user.userType === 'PLATFORM';
+
+    const centerMerchant = isPlatform
+      ? null
+      : await this.prisma.merchant.findUnique({
+          where: { id: user.merchantId ?? -1 },
+          select: { id: true, name: true, status: true },
+        });
+    const centerId = centerMerchant?.id ?? 0;
+
+    const planets = await this.prisma.merchant.findMany({
+      where: isPlatform ? { type: MerchantType.SUB } : { parentId: centerId || -1 },
+      select: { id: true, name: true, code: true, status: true },
+      orderBy: { id: 'asc' },
+    });
+
+    // 本月各行星交易额 / 订单数（一次 groupBy）
+    const rows = await this.prisma.order.groupBy({
+      by: ['merchantId'],
+      where: {
+        consumeTime: { gte: monthStart },
+        merchantId: { in: planets.length ? planets.map((p) => p.id) : [-1] },
+      },
+      _sum: { payAmount: true },
+      _count: { _all: true },
+    });
+    const agg = new Map(rows.map((r) => [r.merchantId, { amount: Number(r._sum.payAmount ?? 0), count: r._count._all }]));
+
+    // 中心指标 = 整个星系（中心 + 所有行星）的汇总：
+    //   平台 = 全部订单；主体 = 自己 + 直属附属（与行星集合一致）。
+    // 若只统计主体自身订单，代金券场景下主体几乎没有消费订单，指标会长期接近 0。
+    const centerScope = isPlatform ? {} : { merchantId: { in: [centerId, ...planets.map((p) => p.id)] } };
+    const [centerMonth, centerToday] = await Promise.all([
+      this.prisma.order.aggregate({
+        where: { consumeTime: { gte: monthStart }, ...centerScope },
+        _sum: { payAmount: true },
+        _count: { _all: true },
+      }),
+      this.prisma.order.aggregate({
+        where: { consumeTime: { gte: dayStart }, ...centerScope },
+        _sum: { payAmount: true },
+      }),
+    ]);
+
+    return {
+      center: {
+        id: centerId,
+        name: centerMerchant?.name ?? '平台',
+        type: isPlatform ? 'PLATFORM' : 'MAIN',
+        status: centerMerchant?.status ?? null,
+        monthAmount: Number(centerMonth._sum.payAmount ?? 0),
+        todayAmount: Number(centerToday._sum.payAmount ?? 0),
+        monthOrderCount: centerMonth._count._all,
+        planetCount: planets.length,
+      },
+      planets: planets.map((p) => ({
+        id: p.id,
+        name: p.name,
+        code: p.code,
+        status: p.status,
+        monthAmount: agg.get(p.id)?.amount ?? 0,
+        orderCount: agg.get(p.id)?.count ?? 0,
+      })),
+      flows: planets.map((p) => ({ source: centerId, target: p.id, value: agg.get(p.id)?.amount ?? 0 })),
+    };
   }
 }

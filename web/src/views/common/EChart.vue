@@ -6,7 +6,7 @@
 // 按需引入：只注册用到的图表与组件，避免全量包（bundle 增量 < 300KB）
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { init, use, type ECharts } from 'echarts/core';
-import { BarChart, LineChart, PieChart } from 'echarts/charts';
+import { BarChart, GraphChart, LineChart, PieChart } from 'echarts/charts';
 import {
   GridComponent,
   LegendComponent,
@@ -19,6 +19,7 @@ use([
   LineChart,
   BarChart,
   PieChart,
+  GraphChart,
   GridComponent,
   TooltipComponent,
   LegendComponent,

@@ -28,6 +28,39 @@ export interface DashboardDistribution {
   couponTypes: Array<{ type: string; count: number }>;
   pointSources: Array<{ type: string; value: number }>;
 }
+
+// ---------------------------------------------------- 星系视图（galaxy）
+export interface DashboardGalaxyCenter {
+  id: number;
+  name: string;
+  type: 'PLATFORM' | 'MAIN';
+  status: string | null;
+  /** 本月交易额 */
+  monthAmount: number;
+  /** 今日交易额 */
+  todayAmount: number;
+  monthOrderCount: number;
+  planetCount: number;
+}
+export interface DashboardGalaxyPlanet {
+  id: number;
+  name: string;
+  code: string | null;
+  status: string;
+  /** 本月交易额（决定星球大小） */
+  monthAmount: number;
+  orderCount: number;
+}
+export interface DashboardGalaxyFlow {
+  source: number;
+  target: number;
+  value: number;
+}
+export interface DashboardGalaxy {
+  center: DashboardGalaxyCenter;
+  planets: DashboardGalaxyPlanet[];
+  flows: DashboardGalaxyFlow[];
+}
 export interface DashboardTopMerchant {
   merchantId: number;
   name: string;
@@ -144,5 +177,8 @@ export const reportApi = {
   },
   dashboardTopMerchants() {
     return http<DashboardTopMerchant[]>({ url: '/dashboard/top-merchants', method: 'GET' });
+  },
+  dashboardGalaxy() {
+    return http<DashboardGalaxy>({ url: '/dashboard/galaxy', method: 'GET' });
   },
 };

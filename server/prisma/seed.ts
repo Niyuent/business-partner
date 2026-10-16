@@ -898,6 +898,13 @@ async function main() {
 
   // ---------------------------------------------------------------- 订单
   console.log('→ 创建订单 ...');
+  // 今日交易额：一部分订单固定为「今天」，保证工作台首屏 / 星系视图的「今日交易额」有值（演示需要）。
+  // 注意：订单的业务时间是 consumeTime（不是 created_at），工作台卡片与星系视图口径都读它。
+  const at = (hour: number, minute = 0) => {
+    const d = new Date();
+    d.setHours(hour, minute, 0, 0);
+    return d;
+  };
   const order1 = await prisma.order.create({
     data: {
       orderNo: 'ORD20260101001',
@@ -912,7 +919,7 @@ async function main() {
       pointsEarned: 108,
       status: OrderStatus.NORMAL,
       source: OrderSource.APPLET,
-      consumeTime: new Date(now.getTime() - 2 * 24 * 3600 * 1000),
+      consumeTime: at(10),
     },
   });
   await prisma.order.create({
@@ -946,7 +953,7 @@ async function main() {
       abnormalType: 'AMOUNT_DISPUTE',
       abnormalRemark: '顾客反馈金额与实际不符，待核实',
       source: OrderSource.APPLET,
-      consumeTime: now,
+      consumeTime: at(15),
     },
   });
   await prisma.order.create({
@@ -960,7 +967,7 @@ async function main() {
       pointsEarned: 0,
       status: OrderStatus.NORMAL,
       source: OrderSource.WEB,
-      consumeTime: now,
+      consumeTime: at(11),
     },
   });
 
