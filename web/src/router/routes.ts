@@ -237,14 +237,14 @@ export const subRoutes: RouteRecordRaw[] = [
   {
     path: '/sub/purchases',
     name: 'SubPurchases',
-    component: P('S4'),
-    meta: { title: '本店采购记录', icon: 'ShoppingCart', permission: 'settlement:view', stage: 'S4' },
+    component: () => import('@/views/sub/purchases.vue'),
+    meta: { title: '本店采购记录', icon: 'ShoppingCart', permission: 'purchase:view', stage: 'S5.5' },
   },
   {
     path: '/sub/settlements',
     name: 'SubSettlements',
-    component: P('S4'),
-    meta: { title: '门店对账账单', icon: 'Wallet', permission: 'settlement:view', stage: 'S4' },
+    component: () => import('@/views/sub/settlements.vue'),
+    meta: { title: '门店对账账单', icon: 'Wallet', permission: 'settlement:view', stage: 'S5.5' },
   },
   {
     path: '/sub/store',
