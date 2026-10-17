@@ -264,6 +264,19 @@ export function formatDateTime(value?: string | null): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
+/**
+ * 手机号脱敏（S5.5-1 附属订单列表用）：138****1234
+ *
+ * 后端 `GET /orders` 返回的是完整手机号（主体端订单页需要），
+ * 附属侧只应看到脱敏值，故在前端展示层统一收敛（不改接口，避免影响既有页面与用例）。
+ */
+export function maskPhone(phone?: string | null): string {
+  if (!phone) return '-';
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 7) return phone; // 位数不足视为非手机号，原样返回
+  return `${digits.slice(0, 3)}****${digits.slice(-4)}`;
+}
+
 /** ISO 时间串：给后端的 from/to（带时区偏移，避免前后端时区不一致导致筛选错位） */
 export function toIso(value: string | null | undefined, endOfDay = false): string | undefined {
   if (!value) return undefined;

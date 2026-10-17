@@ -207,8 +207,8 @@ export const subRoutes: RouteRecordRaw[] = [
   {
     path: '/sub/orders',
     name: 'SubOrders',
-    component: P('S5'),
-    meta: { title: '本店订单', icon: 'Tickets', permission: 'order:view', stage: 'S5' },
+    component: () => import('@/views/sub/orders.vue'),
+    meta: { title: '本店订单', icon: 'Tickets', permission: 'order:view', stage: 'S5.5' },
   },
   {
     path: '/sub/redeem',
@@ -255,8 +255,8 @@ export const subRoutes: RouteRecordRaw[] = [
   {
     path: '/sub/notifications',
     name: 'SubNotifications',
-    component: P('S5'),
-    meta: { title: '接收通知', icon: 'Bell', permission: 'notification:view', stage: 'S5' },
+    component: () => import('@/views/sub/notifications.vue'),
+    meta: { title: '接收通知', icon: 'Bell', permission: 'notification:view', stage: 'S5.5' },
   },
 ];
 

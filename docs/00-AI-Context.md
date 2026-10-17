@@ -63,7 +63,9 @@ docs/                 00-AI-Context(本文件) · 01~06 · archive/test-scripts/
 - **当前**：**S5 进行中**。S5.1 ✅ / S5.2 ✅ / S5.3 ✅；回归入口已含 S5.3（S1–S5.3；此前 204/0 + S5.3 22 条）。
 - **回归入口**：`npm run regression`（seed 一次 → 顺序跑全部阶段脚本，失败即停；含 S5.1/S5.2/S5.3 用例）。
 - **当前**：**S5 收尾阶段**。S5.1 ✅ / S5.2 ✅ / S5.3 ✅；S5.4-B2 前端部分已全部完成：星系视图 ✅、第 3 步通知中心页 ✅（21/0 + 8 截图）、第 5 步发布弹窗 ✅、第 6 步铃铛 ✅（6 截图 + Network）。
-- **S5.4-B2 前端已收官**（第 3 步通知中心页 ✅ / 第 5 步发布弹窗 ✅ / 第 6 步铃铛 ✅）；**S5.4 剩余**：附属侧页面补齐（`/sub/orders|redemptions|purchases|settlements|notifications` 目前多为占位）+ SSE（S7）。
+- **S5.4-B2 前端已收官**（第 3 步通知中心页 ✅ / 第 5 步发布弹窗 ✅ / 第 6 步铃铛 ✅）；S5.4 剩余：SSE（S7）。
+- **S5.5 附属侧页面补齐**：S5.5-1 ✅（`/sub/notifications` 纯收件箱 + `/sub/orders` 本店订单）；剩余 S5.5-2：`/sub/purchases`、`/sub/settlements`。
+- **S5.5-1 要点**：收件箱抽为共用组件 `components/NotificationInbox.vue`（主端/附属共用，`defineExpose({reload})` 供铃铛触发刷新；组件自身已读操作不 bump `readStateVersion`，避免父页重复请求）；附属订单复用 `GET /orders` + `PATCH /orders/:id/abnormal`，手机号前端脱敏（`maskPhone()`），优惠额用「原价−实付」推算（列表接口无 discountAmount）；前端从不传 merchant_id/store_id。
 - **S5.4-B2 第 6 步要点**：`NotificationBell.vue` 徽标（>99 显示 99+）+ Popover（最近 5 条未读 / 全部已读 / 查看全部 / 空态）；未读数只读 `stores/notification.ts`；60s 轮询 + visibility 守卫 + onUnmounted 清理 + 失败静默；`TODO(sse)` 已标注。跨组件同步用 store 的 `readStateVersion`（铃铛已读 → 通知中心页重拉）；`/dashboard` 待办未读数也改读 store。
 - **S5.4-B2 第 5 步要点**：`NotificationSendDialog.vue` 四选一目标 + 联动多选（门店按商家分组）+ 每次打开重拉 targets；提交成功 → toast + 关窗 + 刷当前 Tab + 同步未读数；脏表单关闭需确认。**后端 `targetType` 是单数 `MERCHANT/STORE`**（不是 MERCHANTS/STORES）。
 - **回归入口**：`npm run regression`（seed 一次 → 顺序跑全部阶段脚本，失败即停；含 S5.1/S5.2/S5.3/S5.4-A/S5.4-B1/S5.4-B2，共 313 条）。

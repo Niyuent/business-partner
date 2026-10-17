@@ -1,0 +1,71 @@
+S5.5-1 验收：附属通知中心 + 附属本店订单列表
+日期：2026-10-17   账号：sub01（附属，商户 2）/ clerk01（店员，门店 101）
+抓取方式：agent-browser（真实 Chromium，http://localhost）
+
+================================================================================
+1) /sub/notifications 附属通知中心（纯收件箱）
+================================================================================
+s551-01-sub-notifications.png          页面骨架：标题「接收通知」+ 未读徽标 + 收件箱组件
+s551-02-sub-notifications-unread.png   有数据：3 条未读（红点）+ 2 条已读，级别含 普通/紧急/重要，
+                                       类型含 对账单/异常订单/审核结果/授权变更
+s551-03-sub-notifications-detail.png   点行 → 全文抽屉 + 自动标记已读（与主端同一组件行为）
+
+要点：
+- 直接复用 <NotificationInbox>（S5.5-1 从 /main/notifications 抽出），**无 el-tabs、无「发布通知」按钮**
+  （附属无 notification:send）
+- 铃铛徽标「3」与页面标题「3 条未读」数值一致（同一 store）
+- 未读数/已读操作与铃铛、工作台口径统一
+
+================================================================================
+2) /sub/orders 附属本店订单列表
+================================================================================
+s551-04-sub-orders.png                列表：订单号/消费时间/金额（含优惠推算）/用户（脱敏手机号）/
+                                       状态/关联代金券/操作；共 6 条
+s551-05-mark-abnormal-dialog.png       标记异常弹窗：订单号 + 异常类型 + 说明（≥5 字符，0/200）
+s551-06-mark-abnormal-success.png      提交成功：toast「已标记异常，主体将收到待处理提醒」+
+                                       该行状态 正常 → 异常（AMOUNT_ERROR）
+s551-07-sub-orders-filter-abnormal.png 状态筛选=异常 → 共 2 条
+s551-08-clerk-orders-scope.png         店员 clerk01（门店 101）只看到本店 13 条订单
+
+字段与筛选（按需求逐项）：
+- 订单号 ✓  消费时间 ✓  金额（实付 + 优惠推算）✓  用户（昵称 + 脱敏手机号 138****0003）✓
+- 状态 ✓  关联代金券（券码 + 券状态）✓
+- 筛选：状态 ✓ + 消费时间段 ✓（结束日期按 23:59:59.999 处理，不漏当天）
+- 操作：标记异常（弹窗填原因），受 v-permission="'order:mark-abnormal'" 门禁
+
+================================================================================
+3) Network 证明（无 mock，无 scope 参数）
+================================================================================
+/sub/notifications：
+  GET /api/v1/notifications/unread-count                 200   （铃铛首屏 1 次）
+  GET /api/v1/notifications?page=1&pageSize=10           200   （收件箱列表）
+
+/sub/orders：
+  GET /api/v1/orders?page=1&pageSize=10                                 200   （初始，**无 merchant_id/store_id**）
+  GET /api/v1/orders?page=1&pageSize=10&status=ABNORMAL                 200   （状态筛选）
+  PATCH /api/v1/orders/20657/abnormal                                   200   （标记异常）
+  GET  /api/v1/orders?page=1&pageSize=10                                 200   （提交后刷新）
+
+→ 前端只传 page/pageSize/status/from/to，**从不传 merchant_id / store_id / userId**；
+  数据范围完全由后端按 JWT 推导。
+
+================================================================================
+4) 数据隔离核验（curl 直连，非截图）
+================================================================================
+sub01（附属，商户 2）  可见 6 条，全部 merchantId=2      ✓
+clerk01（店员，门店101）可见 13 条，storeId 全部=101      ✓（含 merchantId=1 的残留单，店员按门店算）
+sub02（附属，商户 3）   可见 2 条，全部 merchantId=3      ✓
+
+⚠️ 数据里的"跨商户"订单是 **S3.x 测试脚本残留**（如 tmp-s31-cases.mjs F12 故意造
+   `ORD-S31-X2 merchantId=2 + storeId=201` 来测「店员传别家门店 → 403」，订单行未清理），
+   并非 scope 泄漏。后端口径：附属按 orders.merchantId、店员按 orders.storeId 过滤，核验通过。
+
+================================================================================
+5) 代码位置
+================================================================================
+web/src/components/NotificationInbox.vue   收件箱共用组件（从主端抽出，暴露 reload()）
+web/src/views/sub/notifications.vue        附属通知中心（纯收件箱 + 未读徽标）
+web/src/views/sub/orders.vue               附属本店订单（筛选 + 脱敏 + 标记异常）
+web/src/views/main/notifications.vue       改用 <NotificationInbox ref>，删除迁移代码与死样式
+web/src/utils/dict.ts                      新增 maskPhone()
+web/src/router/routes.ts                   /sub/notifications、/sub/orders 指向真实页
