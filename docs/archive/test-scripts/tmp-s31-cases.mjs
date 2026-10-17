@@ -299,5 +299,20 @@ log('———— 并发与幂等 ————');
     ok200(c1.status) && ok200(c2.status) && bal === 80, `HTTP=${c1.status}/${c2.status} balance=${bal}`);
 }
 
+// ===================== 清理（S6-A） =====================
+// 本脚本用 mkOrder 直接 SQL 造订单，其中 F11 / F12 / F13 等越权用例**故意**使用
+// 「A 商家的 merchantId + B 商家的 storeId」错配数据（例：ORD-S31-X2 = merchantId 2 + storeId 201），
+// 不清理会让订单列表出现「商户与门店不匹配」的脏数据，污染后续手工验收。
+// 只删未被 coupon_instances 引用的行（orders 仅被该表外键引用），避免外键报错；
+// 若仍有残留，执行 npm run db:reset 兜底。
+try {
+  sql(`DELETE FROM orders WHERE orderNo LIKE 'ORD-S31-%'
+         AND id NOT IN (SELECT orderId FROM coupon_instances WHERE orderId IS NOT NULL);`);
+  const left = scalar(`SELECT COUNT(*) FROM orders WHERE orderNo LIKE 'ORD-S31-%';`);
+  log(`  （已清理 ORD-S31-* 测试订单，剩余 ${left} 条：被券实例引用，保留）`);
+} catch (e) {
+  log(`  ⚠️ 订单清理失败：${e.message}（可执行 npm run db:reset 兜底）`);
+}
+
 log(`\n===== S3.1 结果：${pass} 通过 / ${fail} 失败 =====`);
 process.exit(fail === 0 ? 0 : 1);

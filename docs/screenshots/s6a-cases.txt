@@ -1,0 +1,85 @@
+S6-A 验收：技术债清理 + S4.3 报表回归 + 端到端主链路联调
+日期：2026-10-17
+
+================================================================================
+任务 1：清理测试脚本交叉脏数据
+================================================================================
+问题：历史 S3.x 脚本用「直接 SQL 造订单」的方式准备数据，其中越权用例**故意**使用
+      「A 商家的 merchantId + B 商家的 storeId」错配组合（例：tmp-s31 F12 的
+      `mkOrder('ORD-S31-X2', 1093, 2, 201, 10)`），跑完不清理，导致列表里出现
+      「商户与门店不匹配」的脏数据。
+
+处理（三层）：
+1. **回归前置 seed**（原有）：每次 npm run regression 先重置到固定主键基线。
+2. **回归收尾 seed**（本次新增）：scripts/regression.mjs 用 try/finally 包住跑测流程，
+   无论成功 / 失败 / 中途中断，跑完都再 seed 一次 → 环境一定回到干净基线。
+3. **单脚本自清理**（本次新增）：tmp-s31-cases.mjs 末尾删除自己造的 ORD-S31-* 订单
+   （只删未被 coupon_instances 引用的行，避免外键报错）。
+4. 新增 `npm run db:reset`：单跑某个脚本后一键恢复干净环境。
+
+验证（收尾 seed 后实测）：
+  orders 总数 = 4（seed 基线）
+  错配行（o.merchantId <> s.merchantId）= 0 行  ✅
+  ORD-S3* / TEST* 残留 = 0 行                 ✅
+
+================================================================================
+任务 2：S4.3 报表回归脚本（tmp-s43-cases.mjs，26 条全过）
+================================================================================
+覆盖：
+- 6 张报表 GET /reports/{merchant-onboarding,orders-summary,coupon-summary,
+  points-summary,store-settlement,authorization-logs} → 200 且返回结构逐字段断言
+- 6 张报表 CSV 导出 → 200 + Content-Type: text/csv + **UTF-8 BOM（EF BB BF）** + 表头正确
+- 数据隔离（附属口径为「收敛到本商家」而非 403，脚本按实际语义断言）：
+  · 附属 merchant-onboarding summary.total = 1（主体视角 = 4）
+  · 附属 orders-summary byMerchant 只有自己
+  · 附属 authorization-logs 每行都与自己相关
+  · **附属显式传别家 merchantId=3 → 仍只返回自己（不越权）**
+  · 另一个附属只看自己；店员报表收敛到本店
+- 权限与校验：
+  · 店员无 report:export → 403
+  · 附属有 report:export → 200
+  · 非法报表 key → 404（路由层拦截）
+  · 非法 key 的导出 → 400（DTO @IsIn）
+  · 未登录 → 401；pageSize=201 → 400
+
+踩坑记录（值得留存）：
+  用 `res.text()` 判断 BOM 会**假阴性** —— WHATWG fetch 的 UTF-8 解码会自动剥离 BOM，
+  服务端明明发了 EF BB BF 前端也看不到。改用 `arrayBuffer()` 判前 3 字节。
+
+================================================================================
+任务 3：端到端主链路联调（E2E，真实页面 + 真实接口）
+================================================================================
+链路：C 端登录 → 录单送积分 → 积分兑换券 → 附属核销 → 主体查核销 → 生成对账单
+
+① s6a-01-h5-login.png         H5 微信登录（mock code=dev-code-1001）→ 创建用户 9021
+                              POST /api/v1/auth/user-login 201
+② s6a-02-h5-exchange-before.png  H5 兑换页：积分 0（新用户），4 张可兑换券
+   （后台）POST /api/v1/orders 建单 ORD-E2E-20261017-01 + POST /points/earn 送 200 积分
+③ s6a-03-h5-exchange-confirm.png 兑换 T1 二次确认（消耗 20，剩余 180）
+④ s6a-04-h5-exchange-success.png **兑换成功，券码 H4JFNPFAA482**，有效期 2026-11-16
+                              POST /api/v1/h5/exchange 201
+⑤ s6a-05-sub-redeem-form.png  附属核销页填入券码 + 订单号 + 门店 S-101
+⑥ s6a-06-sub-redeem-verify.png 校验通过「该券可以核销」（券模板 T1 满100减20）
+                              POST /api/v1/redemptions/verify 200
+⑦ s6a-07-redeem-confirm-dialog.png 核销二次确认（核销后不可撤销）
+⑧ s6a-08-sub-redeem-success.png **核销成功，抵扣 20 元**，记录 #230203
+                              POST /api/v1/redemptions 201
+⑨ s6a-09-main-redemptions.png 主体全平台核销记录：按商家分组（城南旗舰店 2 笔 / ¥40），
+                              明细可查到 #230203 H4JFNPFAA482
+                              GET /api/v1/redemptions 200
+⑩ s6a-10-generate-dialog.png  生成对账单：账期 2026-10 + 商家 id 2
+⑪ s6a-11-settlement-generated.png 账单 SET-2-20261001-20261101，核销金额 **40**，**2 笔**
+                              POST /api/v1/settlements/generate 201
+⑫ s6a-12-settlement-detail-e2e.png 明细核对：
+                                T1-USED-CODE   用户 1001  S-101  面值 20  抵扣 20  10-15 23:18
+                                H4JFNPFAA482   用户 9021  S-101  面值 20  抵扣 20  10-17 23:22 ← 本笔
+
+**数据一致性结论**：券码 H4JFNPFAA482 → 用户 9021 → 门店 101（商户 2）→ 抵扣 20 →
+  计入 SET-2-20261001-20261101（40 = 本笔 20 + seed 另一笔 20）。全链路金额/归属/笔数对得上。
+
+================================================================================
+全量回归结果
+================================================================================
+S1 23 / S2 12 / S3.1 32 / S3.2 39 / S3.3 15 / S3.4 20 / S4.1 16 / S4.2 18 /
+**S4.3 26（新增）** / S5.1 14 / S5.2 15 / S5.3 22 / S5.4-A 32 / S5.4-B1 34 / S5.4-B2 21
+= **339 通过 / 0 失败**，且收尾自动重置到干净基线。
