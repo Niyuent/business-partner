@@ -1,0 +1,58 @@
+S5.4-B2 第 3 步 API 用例证据：/main/notifications（通知中心）+ 新增「某批收件人」接口
+日期：2026-10-17   入口：docs/archive/test-scripts/tmp-s54b2-cases.mjs（真实 HTTP，非 mock）
+结果：通过 20 条 / 失败 0 条
+
+================================================================================
+✅ 用例明细（最后一次完整运行，--keep 保留数据供截图）
+================================================================================
+✅ [准备]     三个账号登录 :: platform=true sub01=true admin=true
+✅ [targets]  平台可发布目标 = 已审核附属 + 其营业中门店（不含主体商家） :: merchants=2 stores=3
+✅ [发布]     发给附属商家（MERCHANT）→ 1 条 :: HTTP=201 count=1
+✅ [发布]     一次发给 2 家门店（STORE 多选）→ 2 条 :: HTTP=201 count=2
+✅ [发布]     ALL_MERCHANTS 广播 → 展开为已审核附属数 :: HTTP=201 count=2
+✅ [越权]     平台发给主体商家（非目标）→ 403 :: HTTP=403 reason=FORBIDDEN_SCOPE
+✅ [收件箱]   附属收到本批发给自己的通知（alreadyRead=false） :: total=12 unread=10
+✅ [收件箱]   未读数与列表附带值一致 :: unreadCount=10
+✅ [标记已读] PATCH read → alreadyRead=true :: HTTP=200 alreadyRead=true
+✅ [标记已读] 重复标记仍成功（幂等） :: HTTP=200
+✅ [标记已读] 未读数减 1 :: 10 → 9
+✅ [标记已读] 未读筛选下已读通知不再出现 :: unreadTotal=9
+✅ [发件箱]   三批各聚合成一行（receiverCount 1 / 2 / N） :: c1=1 c2=2 c3=2 total=8
+✅ [收件人]   新接口返回本批 2 名门店收件人（含名称/编码/所属商家）
+              :: HTTP=200 S-101 中心店#S-101 | S-102 车站店#S-102
+✅ [收件人]   MERCHANT 批次返回 1 名商家收件人 :: HTTP=200 城南旗舰店
+✅ [越权]     无 notification:send 的附属查收件人 → 403（权限守卫先行）:: HTTP=403 reason=PERMISSION_DENIED
+✅ [越权]     有发送权但非发送人（主体）查别人批次 → 404 :: HTTP=404 reason=RESOURCE_NOT_FOUND
+✅ [越权]     不存在的 uuid → 404 :: HTTP=404 reason=RESOURCE_NOT_FOUND
+✅ [越权]     无 notification:send 的附属查发件箱 → 403 :: HTTP=403 reason=PERMISSION_DENIED
+✅ [越权]     标记不存在/非自己接收范围的通知 → 404 :: HTTP=404 reason=RESOURCE_NOT_FOUND
+
+================================================================================
+本次发现并修复的 bug（S5.4-B1 遗留，被本批用例抓到）
+================================================================================
+文件：server/src/modules/notification/notification.service.ts  markRead()
+
+  修复前：return { ...this.withReadState(row), alreadyRead: count === 0 };
+  修复后：return this.withReadState(row);
+
+现象：首次标记已读返回 alreadyRead=false，重复标记反而返回 true —— 语义完全颠倒。
+      （count 是 createMany skipDuplicates 实际新建行数：首标=1、重标=0。）
+根因：withReadState 已在 create 之后重查 read 记录、本身就是权威口径，却又被 count===0 覆盖。
+影响：前端列表/详情靠手动置 true 所以 UI 看不出问题，但 API 契约错误（第三方接入会踩坑）。
+验证：修复后用例「PATCH read → alreadyRead=true」通过；重复标记仍 200（幂等保持）。
+
+================================================================================
+设计约束确认（本次用例固化）
+================================================================================
+1. 平台的发布目标**不含主体商家**：主体/平台只能当发送方，收不到通知
+   （平台 targets merchants=2，即两个已审核附属；发给 merchantId=1 → 403 FORBIDDEN_SCOPE）。
+   → 主体通知中心收件箱基本为空属**预期行为**，不是 bug。
+2. 两级越权口径：无 notification:send → 403（权限守卫）；有权限但非发送人 → 404（不泄露存在性）。
+
+================================================================================
+质量门
+================================================================================
+nest build（server）        ✅
+vue-tsc --noEmit（web）     ✅
+vite build（经 gateway 镜像）✅
+S5.4-B2 第 3 步用例          20/0

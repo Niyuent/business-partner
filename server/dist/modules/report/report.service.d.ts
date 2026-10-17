@@ -1,10 +1,12 @@
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { JwtPayload } from '../auth/jwt-payload';
+import { NotificationService } from '../notification/notification.service';
 import { ReportKey, ReportQueryDto, TrendQueryDto } from './dto/report.dto';
 export declare class ReportService {
     private readonly prisma;
+    private readonly notifications;
     private readonly logger;
-    constructor(prisma: PrismaService);
+    constructor(prisma: PrismaService, notifications: NotificationService);
     private scope;
     private range;
     private hasRange;
@@ -166,4 +168,29 @@ export declare class ReportService {
         name: string;
         amount: number;
     }>>;
+    galaxy(user: JwtPayload): Promise<{
+        center: {
+            id: number;
+            name: string;
+            type: string;
+            status: import(".prisma/client").$Enums.MerchantStatus;
+            monthAmount: number;
+            todayAmount: number;
+            monthOrderCount: number;
+            planetCount: number;
+        };
+        planets: {
+            id: number;
+            name: string;
+            code: string;
+            status: import(".prisma/client").$Enums.MerchantStatus;
+            monthAmount: number;
+            orderCount: number;
+        }[];
+        flows: {
+            source: number;
+            target: number;
+            value: number;
+        }[];
+    }>;
 }

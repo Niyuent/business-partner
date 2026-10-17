@@ -12,11 +12,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ReportService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
+const biz_exception_1 = require("../../common/exceptions/biz.exception");
 const csv_util_1 = require("../../common/utils/csv.util");
 const prisma_service_1 = require("../../common/prisma/prisma.service");
+const notification_service_1 = require("../notification/notification.service");
 let ReportService = class ReportService {
-    constructor(prisma) {
+    constructor(prisma, notifications) {
         this.prisma = prisma;
+        this.notifications = notifications;
         this.logger = new common_1.Logger('Report');
     }
     async scope(user) {
@@ -450,14 +453,10 @@ let ReportService = class ReportService {
             status: 'ABNORMAL',
             ...(merchantId ? { merchantId } : {}),
         };
-        const receivers = [merchantId, user.sub].filter((v) => typeof v === 'number');
-        const unreadWhere = { readStatus: 'UNREAD' };
-        if (receivers.length)
-            unreadWhere.receiverId = { in: receivers };
         const [pendingMerchants, abnormalOrders, unreadNotifications] = await Promise.all([
             this.prisma.merchant.count({ where: pendingWhere }),
             this.prisma.order.count({ where: abnormalWhere }),
-            this.prisma.notification.count({ where: unreadWhere }),
+            this.notifications.getUnreadCount(user),
         ]);
         return { pendingMerchants, abnormalOrders, unreadNotifications };
     }
@@ -553,10 +552,76 @@ let ReportService = class ReportService {
             amount: Number(r.amount),
         }));
     }
+    async galaxy(user) {
+        const { merchantId } = await this.scope(user);
+        if (merchantId) {
+            throw biz_exception_1.BizException.forbidden(biz_exception_1.ReasonCode.FORBIDDEN_SCOPE, '星系视图仅主体/平台可用');
+        }
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const isPlatform = user.userType === 'PLATFORM';
+        const centerMerchant = isPlatform
+            ? null
+            : await this.prisma.merchant.findUnique({
+                where: { id: user.merchantId ?? -1 },
+                select: { id: true, name: true, status: true },
+            });
+        const centerId = centerMerchant?.id ?? 0;
+        const planets = await this.prisma.merchant.findMany({
+            where: isPlatform ? { type: client_1.MerchantType.SUB } : { parentId: centerId || -1 },
+            select: { id: true, name: true, code: true, status: true },
+            orderBy: { id: 'asc' },
+        });
+        const rows = await this.prisma.order.groupBy({
+            by: ['merchantId'],
+            where: {
+                consumeTime: { gte: monthStart },
+                merchantId: { in: planets.length ? planets.map((p) => p.id) : [-1] },
+            },
+            _sum: { payAmount: true },
+            _count: { _all: true },
+        });
+        const agg = new Map(rows.map((r) => [r.merchantId, { amount: Number(r._sum.payAmount ?? 0), count: r._count._all }]));
+        const centerScope = isPlatform ? {} : { merchantId: { in: [centerId, ...planets.map((p) => p.id)] } };
+        const [centerMonth, centerToday] = await Promise.all([
+            this.prisma.order.aggregate({
+                where: { consumeTime: { gte: monthStart }, ...centerScope },
+                _sum: { payAmount: true },
+                _count: { _all: true },
+            }),
+            this.prisma.order.aggregate({
+                where: { consumeTime: { gte: dayStart }, ...centerScope },
+                _sum: { payAmount: true },
+            }),
+        ]);
+        return {
+            center: {
+                id: centerId,
+                name: centerMerchant?.name ?? '平台',
+                type: isPlatform ? 'PLATFORM' : 'MAIN',
+                status: centerMerchant?.status ?? null,
+                monthAmount: Number(centerMonth._sum.payAmount ?? 0),
+                todayAmount: Number(centerToday._sum.payAmount ?? 0),
+                monthOrderCount: centerMonth._count._all,
+                planetCount: planets.length,
+            },
+            planets: planets.map((p) => ({
+                id: p.id,
+                name: p.name,
+                code: p.code,
+                status: p.status,
+                monthAmount: agg.get(p.id)?.amount ?? 0,
+                orderCount: agg.get(p.id)?.count ?? 0,
+            })),
+            flows: planets.map((p) => ({ source: centerId, target: p.id, value: agg.get(p.id)?.amount ?? 0 })),
+        };
+    }
 };
 exports.ReportService = ReportService;
 exports.ReportService = ReportService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        notification_service_1.NotificationService])
 ], ReportService);
 //# sourceMappingURL=report.service.js.map

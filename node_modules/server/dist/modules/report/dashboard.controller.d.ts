@@ -44,4 +44,29 @@ export declare class DashboardController {
         name: string;
         amount: number;
     }[]>;
+    galaxy(user: JwtPayload): Promise<{
+        center: {
+            id: number;
+            name: string;
+            type: string;
+            status: import(".prisma/client").$Enums.MerchantStatus;
+            monthAmount: number;
+            todayAmount: number;
+            monthOrderCount: number;
+            planetCount: number;
+        };
+        planets: {
+            id: number;
+            name: string;
+            code: string;
+            status: import(".prisma/client").$Enums.MerchantStatus;
+            monthAmount: number;
+            orderCount: number;
+        }[];
+        flows: {
+            source: number;
+            target: number;
+            value: number;
+        }[];
+    }>;
 }

@@ -45,6 +45,16 @@ export class NotificationController {
     return this.service.listSent(query, user);
   }
 
+  @Get('sent/:sendBatchId')
+  @Permissions('notification:send')
+  @ApiOperation({
+    summary: '某批发送的收件人明细（只能看自己发的批次）',
+    description: '「发件箱」点击某条发送后展示本批发给了哪些商家 / 门店；非本人或不存在 → 404 RESOURCE_NOT_FOUND。',
+  })
+  batchReceivers(@Param('sendBatchId') sendBatchId: string, @CurrentUser() user: JwtPayload) {
+    return this.service.batchReceivers(sendBatchId, user);
+  }
+
   @Get('targets')
   @Permissions('notification:send')
   @ApiOperation({

@@ -62,7 +62,10 @@ docs/                 00-AI-Context(本文件) · 01~06 · archive/test-scripts/
 
 - **当前**：**S5 进行中**。S5.1 ✅ / S5.2 ✅ / S5.3 ✅；回归入口已含 S5.3（S1–S5.3；此前 204/0 + S5.3 22 条）。
 - **回归入口**：`npm run regression`（seed 一次 → 顺序跑全部阶段脚本，失败即停；含 S5.1/S5.2/S5.3 用例）。
-- **下一步**：S5.4 通知落地（站内信 / SSE / 通知中心）+ 附属侧页面补齐（每批停下验收）。
+- **当前**：**S5 收尾阶段**。S5.1 ✅ / S5.2 ✅ / S5.3 ✅；S5.4 进行中：B1（每人各自已读/发送批次/我发过的）✅、B2 星系视图 ✅、**B2 第 3 步通知中心页 `/main/notifications` ✅（20/0 + 8 截图）**。
+- **S5.4 剩余**：第 5 步 `NotificationSendDialog`（发布弹窗）→ 第 6 步 `NotificationBell` 铃铛（未读数 + 下拉）→ 附属侧页面补齐 + SSE。
+- **回归入口**：`npm run regression`（seed 一次 → 顺序跑全部阶段脚本，失败即停；含 S5.1/S5.2/S5.3/S5.4-A/S5.4-B1/S5.4-B2，共 313 条）。
+- **下一步**：S5.4 第 5 步发布弹窗 → 第 6 步铃铛 → 附属侧 + SSE（每批停下验收）。
 
 ## 7. 关键约定（必须遵守）
 
@@ -114,7 +117,9 @@ S5 范围（4 批，每批停下验收）：
 - **S5.1 C 端用户鉴权** ✅（微信 code2session + C 端 JWT + 双向隔离 + P0 限流/模拟安全）。
 - **S5.2 用户管理（主体后台）** ✅（`/main/users` 列表 / 详情 / 启停 / 绑手机号；附属/店员按「本店消费过」隔离）。
 - **S5.3 门店变更申请** ✅（`/sub/store` 提交 → `/main/store-change-requests` 审核 → 同事务生效；白名单字段 + 同店 PENDING 唯一 + 驳回必填原因 + 越权 403/状态机 409）。
-- **S5.4 通知 + 附属侧补齐** ⬜（站内信 / SSE / 通知中心；`/sub/orders|redemptions|purchases|settlements|notifications`）。
+- **S5.4 通知 + 附属侧补齐** 🔶（B1 每人各自已读/发送批次 ✅、B2 星系视图 ✅、B2 通知中心页 `/main/notifications` ✅（20/0）；剩余：发布弹窗、铃铛、SSE、`/sub/*` 页面）。
+- **S5.4-B2 通知中心要点**：`el-tabs` 收件箱/发件箱 + URL `?tab=inbox|sent` 同步（replace + 监听 query）；`NotificationBell.vue` 空占位已挂 `AdminLayout` header-right；新增 `GET /notifications/sent/:sendBatchId`（某批收件人，仅本人批次）；路由权限 `notification:manage` → `notification:view`。
+- **S5.4-B2 修复**：`markRead` 的 `alreadyRead: count === 0` 语义颠倒（首标 false / 重标 true）→ 改为直接返回 `withReadState(row)`。
 
 **S5 起点必做（S4 收口遗留）**
 1. ✅ C 端 `users` 与后台 `admin_users` 鉴权关系已明确（见第 9 节）。

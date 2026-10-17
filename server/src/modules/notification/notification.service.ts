@@ -237,7 +237,10 @@ export class NotificationService {
       where: { id },
       include: this.readInclude(uid),
     });
-    return { ...this.withReadState(row), alreadyRead: count === 0 };
+    // 修复（S5.4-B2 验收发现）：此前写成 `alreadyRead: count === 0` —— 语义完全颠倒
+    // （首次标记 count=1 反而返回 false，重复标记 count=0 才返回 true）。
+    // withReadState 已在 create 之后重查 read 记录，本身就是权威口径，直接返回即可。
+    return this.withReadState(row);
   }
 
   async markAllRead(user: JwtPayload) {
@@ -420,5 +423,66 @@ export class NotificationService {
       this.logger.warn(`targets 超过 ${LIMIT}，需要分页（merchants=${merchants.length} stores=${stores.length}）`);
     }
     return { merchants, stores };
+  }
+
+  /**
+   * 某个发送批次的收件人明细（S5.4-B2：「发件箱 → 查看本批发给了谁」）
+   *
+   * 安全边界与 `listSent` 一致：先过 `senderMerchantScope`（仅平台/主体），
+   * 再要求 `senderId = 当前账号` —— 别人的 / 不存在的批次一律 404（不泄露存在性）。
+   * 名称用两次批量查询解析（避免 N+1）；单批上限 500（targets 上限 200，正常发送远小于此）。
+   */
+  async batchReceivers(sendBatchId: string, user: JwtPayload) {
+    await this.senderMerchantScope(user);
+
+    const LIMIT = 500;
+    const rows = await this.prisma.notification.findMany({
+      where: { sendBatchId, senderId: user.sub },
+      select: { id: true, receiverType: true, receiverId: true, createdAt: true },
+      orderBy: { id: 'asc' },
+      take: LIMIT,
+    });
+    if (!rows.length) {
+      throw BizException.notFound(ReasonCode.RESOURCE_NOT_FOUND, '发送批次不存在或不属于你');
+    }
+
+    const merchantIds = [
+      ...new Set(rows.filter((r) => r.receiverType === ReceiverType.MERCHANT).map((r) => r.receiverId)),
+    ];
+    const storeIds = [...new Set(rows.filter((r) => r.receiverType === ReceiverType.STORE).map((r) => r.receiverId))];
+    // 空数组也照常查询（`in: []` 返回空集），避免三元表达式把数组合成 union 导致 map 推断失效
+    const [merchants, stores] = await Promise.all([
+      this.prisma.merchant.findMany({
+        where: { id: { in: merchantIds } },
+        select: { id: true, name: true, code: true },
+      }),
+      this.prisma.store.findMany({
+        where: { id: { in: storeIds } },
+        select: { id: true, name: true, code: true, merchantId: true },
+      }),
+    ]);
+    const merchantMap = new Map(merchants.map((m) => [m.id, m] as const));
+    const storeMap = new Map(stores.map((s) => [s.id, s] as const));
+
+    return {
+      sendBatchId,
+      receivers: rows.map((r) =>
+        r.receiverType === ReceiverType.STORE
+          ? {
+              receiverType: r.receiverType,
+              receiverId: r.receiverId,
+              name: storeMap.get(r.receiverId)?.name ?? `门店 #${r.receiverId}`,
+              code: storeMap.get(r.receiverId)?.code ?? null,
+              merchantId: storeMap.get(r.receiverId)?.merchantId ?? null,
+            }
+          : {
+              receiverType: r.receiverType,
+              receiverId: r.receiverId,
+              name: merchantMap.get(r.receiverId)?.name ?? `商家 #${r.receiverId}`,
+              code: merchantMap.get(r.receiverId)?.code ?? null,
+              merchantId: null,
+            },
+      ),
+    };
   }
 }

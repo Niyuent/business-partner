@@ -46,6 +46,8 @@
         </div>
 
         <div class="layout__header-right">
+          <!-- 站内信铃铛：S5.4-B2 第 6 步填充（未读数徽标 + 下拉面板） -->
+          <NotificationBell />
           <el-tag size="small" :type="userStore.isMainMerchant ? 'warning' : 'success'">
             {{ userStore.isMainMerchant ? '主体商家' : userStore.profile?.store?.name || userStore.profile?.merchant?.name || '附属商家' }}
           </el-tag>
@@ -77,6 +79,7 @@ import { useRoute, useRouter, type RouteRecordRaw } from 'vue-router';
 import { ElMessageBox } from 'element-plus';
 import { useAppStore } from '@/stores/app';
 import { useUserStore } from '@/stores/user';
+import NotificationBell from '@/components/NotificationBell.vue';
 
 const route = useRoute();
 const router = useRouter();

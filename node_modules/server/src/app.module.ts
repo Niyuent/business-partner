@@ -23,6 +23,7 @@ import { ReportModule } from './modules/report/report.module';
 import { H5Module } from './modules/h5/h5.module';
 import { UserModule } from './modules/user/user.module';
 import { StoreModule } from './modules/store/store.module';
+import { NotificationModule } from './modules/notification/notification.module';
 
 /**
  * 全站默认鉴权策略：**拒绝未声明的**。
@@ -68,6 +69,8 @@ import { StoreModule } from './modules/store/store.module';
     UserModule,
     // S5.3：门店变更申请（附属提交 → 主体审核 → 生效，白名单字段）
     StoreModule,
+    // S5.4-A：站内信（列表 / 未读数 / 已读 / 主体发布）
+    NotificationModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

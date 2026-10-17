@@ -52,4 +52,14 @@ export class DashboardController {
   topMerchants(@CurrentUser() user: JwtPayload) {
     return this.reports.topMerchants(user);
   }
+
+  @Get('galaxy')
+  @Permissions('dashboard:view')
+  @ApiOperation({
+    summary: '星系视图：中心商家 + 环绕附属（大小=本月交易额，颜色=状态）+ 交易额边',
+    description: '平台/主体可用；**附属/店员返回 403 FORBIDDEN_SCOPE**（前端据此降级为数据视图）。',
+  })
+  galaxy(@CurrentUser() user: JwtPayload) {
+    return this.reports.galaxy(user);
+  }
 }

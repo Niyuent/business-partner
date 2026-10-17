@@ -192,8 +192,8 @@ export const mainRoutes: RouteRecordRaw[] = [
   {
     path: '/main/notifications',
     name: 'MainNotifications',
-    component: P('S5'),
-    meta: { title: '通知管理', icon: 'Bell', permission: 'notification:manage', stage: 'S5' },
+    component: () => import('@/views/main/notifications.vue'),
+    meta: { title: '通知管理', icon: 'Bell', permission: 'notification:view', stage: 'S5.4' },
   },
   {
     path: '/main/audit-logs',

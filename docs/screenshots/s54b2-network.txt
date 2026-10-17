@@ -1,0 +1,63 @@
+S5.4-B2 第 3 步：/main/notifications（通知中心）Network 请求证据
+抓取方式：agent-browser（真实 Chromium，http://localhost，DevTools 网络面板等价物 `network requests`）
+日期：2026-10-17
+
+================================================================================
+1) 主体（admin）打开 /main/notifications?tab=inbox —— 收件箱
+================================================================================
+[24DAD2257C10DD2D798256E2FF4FF53B] GET http://localhost/main/notifications?tab=inbox (Document) 200
+[8932.50]  GET http://localhost/assets/notifications-DnJ3Lj05.js   (Script)     200   <- 新页面 chunk 已部署
+[8932.52] GET http://localhost/assets/notifications-3FSlRkWL.css   (Stylesheet) 200
+[8932.53] GET http://localhost/api/v1/notifications?page=1&pageSize=10 (XHR) 200   <- 真实后端，无 mock
+
+================================================================================
+2) 点击列表行（查看全文 + 自动标记已读）
+================================================================================
+[8932.54] PATCH http://localhost/api/v1/notifications/880139/read (XHR) 200
+           -> 响应 alreadyRead=true；页面 toast「已标记为已读」；行红点消失、未读数 1→0
+           -> 该接口此前 alreadyRead 逻辑颠倒（首标返回 false），本次已修复，见 s54b2-api-cases.txt
+
+================================================================================
+3) 切到「发件箱」Tab —— URL 同步
+================================================================================
+点击 Tab 后 URL 由 ?tab=inbox 变为 http://localhost/main/notifications?tab=sent
+刷新（reload）后：URL 仍为 ?tab=sent，选中的 Tab 仍是「发件箱」→ 刷新保持生效
+
+================================================================================
+4) 平台（platform）打开 /main/notifications?tab=sent —— 发件箱
+================================================================================
+[D665F4F600326D12E0EDD295C30B1E9D] GET http://localhost/main/notifications?tab=sent (Document) 200
+[8932.121] GET http://localhost/assets/notifications-DnJ3Lj05.js   (Script)     200
+[8932.123] GET http://localhost/assets/notifications-3FSlRkWL.css   (Stylesheet) 200
+[8932.124] GET http://localhost/api/v1/notifications/sent?page=1&pageSize=10 (XHR) 200
+           -> 5 个批次各一行（按 sendBatchId 聚合，含 receiverCount）
+
+================================================================================
+5) 点击「收件人」—— 新增接口 GET /notifications/sent/:sendBatchId
+================================================================================
+[8932.125] GET http://localhost/api/v1/notifications/sent/c004636c-aadf-4d23-a62e-5144fbac7936 (XHR) 200
+           -> 弹窗展示 2 名「附属商家」收件人：城南旗舰店(SUB-01)、城西社区店(SUB-02)
+
+================================================================================
+6) 空态文案随筛选切换
+================================================================================
+筛选中切到「未读」（且无未读）→ el-empty 文案「没有未读通知」
+（已读 → 「没有已读通知」；全部 → 「暂无通知」；发件箱 → 「还没有发过通知」）
+
+================================================================================
+截图清单（同目录）
+================================================================================
+s54b2-01-inbox-admin.png                主体收件箱（1 条未读 + 级别标签 + 红点 + 筛选/分页）
+s54b2-02-publish-placeholder.png        「发布通知」占位弹窗（第 5 步做 NotificationSendDialog）
+s54b2-03-detail-drawer.png              点击行 → 全文抽屉 + 自动标记已读 + toast
+s54b2-04-sent-tab.png                   切到发件箱（admin 无发送记录 → 空态）
+s54b2-05-tab-persist-after-reload.png   刷新后仍在发件箱（URL ?tab=sent 保持）
+s54b2-06-sent-platform.png              platform 发件箱（5 批聚合 + 接收人数）
+s54b2-07-batch-receivers.png            某批收件人弹窗（新增接口）
+s54b2-08-empty-unread.png               未读筛选空态文案
+
+================================================================================
+接口用例（真实 HTTP，20 条全过）
+================================================================================
+docs/archive/test-scripts/tmp-s54b2-cases.mjs   （npm 执行：node docs/archive/test-scripts/tmp-s54b2-cases.mjs --keep）
+证据：docs/screenshots/s54b2-api-cases.txt

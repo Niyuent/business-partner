@@ -788,13 +788,38 @@ model Notification {
   level        NotifyLevel      @default(NORMAL)
   bizType      String?          @db.VarChar(50)
   bizId        Int?             @db.UnsignedInt
+  // S5.4-B1：发布人（admin_users.id）；「全部发送」展开成 N 行时每行都填
+  senderId     Int?             @db.UnsignedInt
+  // S5.4-B1：一次发送动作的批次号（UUID）。展开的 N 行共享同一值，「我发过的通知」据此聚合，
+  // 避免用「标题 + 秒级时间」分组时把同一秒内的两次同名发送误合并。
+  sendBatchId  String?          @db.VarChar(36)
+  // ⚠️ deprecated：S5.4-B1 起已读状态以 NotificationRead（每人一条）为准，本列**停止写入**，
+  //    仅为平滑回滚保留；S7 双向对流改造时随 schema 大改一并删除。
   readStatus   ReadStatus       @default(UNREAD)
   readAt       DateTime?
   createdAt    DateTime         @default(now())
 
+  reads NotificationRead[]
+
   // 多态接收方：receiverType + receiverId，不建外键
   @@index([receiverType, receiverId, readStatus])
+  @@index([senderId, createdAt])
   @@map("notifications")
+}
+
+/// S5.4-B1：通知的「每人各自已读」记录。
+/// 同一门店通知在库中只有一行，店员与附属管理员各记一条阅读记录，互不影响。
+model NotificationRead {
+  id             Int      @id @default(autoincrement()) @db.UnsignedInt
+  notificationId Int      @db.UnsignedInt
+  adminUserId    Int      @db.UnsignedInt
+  readAt         DateTime @default(now())
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, adminUserId])
+  @@index([adminUserId])
+  @@map("notification_reads")
 }
 
 model AuditLog {

@@ -100,7 +100,8 @@ let nid = 0;
   const ck = await call('PATCH', `notifications/${nid}/read`, CK);
   const ckAfter = (await call('GET', 'notifications/unread-count', CK)).data?.unreadCount ?? 0;
   const s1After = (await call('GET', 'notifications/unread-count', S1)).data?.unreadCount ?? 0;
-  ok('A3', '店员标记已读 → 200 且 alreadyRead=false', ck.status === 200 && ck.data?.alreadyRead === false, `HTTP=${ck.status} alreadyRead=${ck.data?.alreadyRead}`);
+  // 修正（S5.4-B2 发现并修复 markRead 的 alreadyRead 语义颠倒 bug）：标记已读应返回 true
+  ok('A3', '店员标记已读 → 200 且 alreadyRead=true', ck.status === 200 && ck.data?.alreadyRead === true, `HTTP=${ck.status} alreadyRead=${ck.data?.alreadyRead}`);
   ok('A4', '店员未读数 -1', ckAfter === ckUnreadBefore - 1, `${ckUnreadBefore} → ${ckAfter}`);
   ok('A5', '附属未读数**不受影响**（各自已读）', s1After === s1UnreadBefore, `${s1UnreadBefore} → ${s1After}`);
   const ckReadIds = ((await call('GET', 'notifications?readStatus=UNREAD&pageSize=100', CK)).data?.list ?? []).map((x) => x.id);

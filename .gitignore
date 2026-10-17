@@ -18,6 +18,9 @@
 tmp-*.sql
 **/tmp-*.sql
 
+# 【仍然生效】HAR 抓包文件：浏览器验收的原始记录，体积大不入库（只保留同名 .txt 摘要）
+*.har
+
 # node_modules/
 # **/node_modules/
 # dist/

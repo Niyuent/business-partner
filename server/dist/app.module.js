@@ -32,6 +32,7 @@ const report_module_1 = require("./modules/report/report.module");
 const h5_module_1 = require("./modules/h5/h5.module");
 const user_module_1 = require("./modules/user/user.module");
 const store_module_1 = require("./modules/store/store.module");
+const notification_module_1 = require("./modules/notification/notification.module");
 let AppModule = class AppModule {
     configure(consumer) {
         consumer.apply(trace_middleware_1.TraceMiddleware).forRoutes('*');
@@ -61,6 +62,7 @@ exports.AppModule = AppModule = __decorate([
             h5_module_1.H5Module,
             user_module_1.UserModule,
             store_module_1.StoreModule,
+            notification_module_1.NotificationModule,
         ],
         providers: [
             { provide: core_1.APP_GUARD, useClass: jwt_auth_guard_1.JwtAuthGuard },

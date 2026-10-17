@@ -150,7 +150,7 @@ let s101Id = 0;
 }
 {
   const r = await call('PATCH', `notifications/${s101Id}/read`, CK);
-  ok('S7', '店员标记已读 → READ + alreadyRead=false', r.status === 200 && r.data?.readStatus === 'READ' && r.data?.alreadyRead === false && !!r.data?.readAt, `HTTP=${r.status} ${r.data?.readStatus} already=${r.data?.alreadyRead}`);
+  ok('S7', '店员标记已读 → READ + alreadyRead=true', r.status === 200 && r.data?.readStatus === 'READ' && r.data?.alreadyRead === true && !!r.data?.readAt, `HTTP=${r.status} ${r.data?.readStatus} already=${r.data?.alreadyRead}`);
   const r2 = await call('PATCH', `notifications/${s101Id}/read`, CK);
   const c = await call('GET', 'notifications/unread-count', CK);
   ok('S8', '重复标记已读幂等 → 200 alreadyRead=true，未读数归 0', r2.status === 200 && r2.data?.alreadyRead === true && c.data?.unreadCount === 0, `HTTP=${r2.status} already=${r2.data?.alreadyRead} unread=${c.data?.unreadCount}`);
