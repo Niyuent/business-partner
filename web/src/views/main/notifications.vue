@@ -323,6 +323,17 @@ const inboxTotal = ref(0);
 /** 未读数改为 store 单一数据源（页面徽标与第 6 步铃铛共用，避免口径不一致） */
 const notificationStore = useNotificationStore();
 const unreadCount = computed(() => notificationStore.unreadCount);
+
+/**
+ * 铃铛（挂在 AdminLayout，任何页面都能点）标记已读 / 全部已读后，
+ * 通过 store 的版本号通知本页刷新收件箱，避免出现「铃铛说 0 未读、列表还挂着红点」。
+ */
+watch(
+  () => notificationStore.readStateVersion,
+  () => {
+    if (activeTab.value === 'inbox') void loadInbox();
+  },
+);
 const inboxQuery = reactive({
   page: 1,
   pageSize: 10,

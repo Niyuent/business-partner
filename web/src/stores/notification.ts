@@ -41,5 +41,17 @@ export const useNotificationStore = defineStore('notification', () => {
     unreadCount.value = 0;
   }
 
-  return { unreadCount, loaded, setCount, refresh, decrement, clear };
+  /**
+   * 已读状态变更计数器（S5.4-B2 第 6 步）
+   *
+   * 铃铛在**任何页面**都能标记已读/全部已读，而收件箱列表在另一个组件里。
+   * 让页面去 watch 未读数不可靠（数值可能不变），因此用单调递增的版本号：
+   * 铃铛改一次 → +1 → 通知中心页监听它并重拉列表。
+   */
+  const readStateVersion = ref(0);
+  function bumpReadState() {
+    readStateVersion.value += 1;
+  }
+
+  return { unreadCount, loaded, readStateVersion, setCount, refresh, decrement, clear, bumpReadState };
 });

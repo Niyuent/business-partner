@@ -25,7 +25,7 @@
         </div>
         <div class="galaxy__overlay-todo">
           待办 <b>{{ todoTotal }}</b> 项 · 待审 {{ todo.pendingMerchants }} / 异常 {{ todo.abnormalOrders }} / 未读
-          {{ todo.unreadNotifications }}
+          {{ unreadNotifications }}
         </div>
         <el-button size="small" type="primary" @click="viewMode = 'data'">查看详情</el-button>
       </div>
@@ -88,7 +88,7 @@
           <el-card shadow="hover" class="metric todo" @click="onTodoClick">
             <el-statistic title="待办事项" :value="todoTotal" />
             <div class="card-sub">
-              待审 {{ todo.pendingMerchants }} · 异常 {{ todo.abnormalOrders }} · 未读 {{ todo.unreadNotifications }}
+              待审 {{ todo.pendingMerchants }} · 异常 {{ todo.abnormalOrders }} · 未读 {{ unreadNotifications }}
             </div>
           </el-card>
         </el-col>
@@ -140,7 +140,7 @@
           <el-col :span="8">
             <div class="todo-item" @click="$router.push('/main/notifications')">
               <span class="todo-label">未读通知</span>
-              <span class="todo-num">{{ todo.unreadNotifications }}</span>
+              <span class="todo-num">{{ unreadNotifications }}</span>
             </div>
           </el-col>
         </el-row>
@@ -163,8 +163,10 @@ import {
   type DashboardDistribution,
   type DashboardTopMerchant,
 } from '@/api/report';
+import { useNotificationStore } from '@/stores/notification';
 
 const router = useRouter();
+const notificationStore = useNotificationStore();
 
 /** 视图模式：galaxy=星系视图，data=数据视图；localStorage 持久化，默认星系视图 */
 const VIEW_KEY = 'dashboard:view';
@@ -182,8 +184,16 @@ const top = ref<DashboardTopMerchant[]>([]);
 const galaxy = ref<DashboardGalaxy | null>(null);
 
 const todo = computed(() => stats.value?.todo ?? { pendingMerchants: 0, abnormalOrders: 0, unreadNotifications: 0 });
+/**
+ * 未读通知数：**铃铛（store）是单一数据源**（S5.4-B2 第 6 步）。
+ * store 尚未加载完成时先用工作台接口的快照兜底，避免首屏闪 0；
+ * 这样在顶栏铃铛里点「全部已读」后，本卡片会立刻跟着变，不会出现「铃铛 0 / 待办 3」。
+ */
+const unreadNotifications = computed(() =>
+  notificationStore.loaded ? notificationStore.unreadCount : (stats.value?.todo?.unreadNotifications ?? 0),
+);
 const todoTotal = computed(
-  () => todo.value.pendingMerchants + todo.value.abnormalOrders + todo.value.unreadNotifications,
+  () => todo.value.pendingMerchants + todo.value.abnormalOrders + unreadNotifications.value,
 );
 const metricCards = computed(() => (stats.value?.cards ?? []) as DashboardCard[]);
 
