@@ -62,8 +62,9 @@ docs/                 00-AI-Context(本文件) · 01~06 · archive/test-scripts/
 
 - **当前**：**S5 进行中**。S5.1 ✅ / S5.2 ✅ / S5.3 ✅；回归入口已含 S5.3（S1–S5.3；此前 204/0 + S5.3 22 条）。
 - **回归入口**：`npm run regression`（seed 一次 → 顺序跑全部阶段脚本，失败即停；含 S5.1/S5.2/S5.3 用例）。
-- **当前**：**S5 收尾阶段**。S5.1 ✅ / S5.2 ✅ / S5.3 ✅；S5.4 进行中：B1（每人各自已读/发送批次/我发过的）✅、B2 星系视图 ✅、**B2 第 3 步通知中心页 `/main/notifications` ✅（20/0 + 8 截图）**。
-- **S5.4 剩余**：第 5 步 `NotificationSendDialog`（发布弹窗）→ 第 6 步 `NotificationBell` 铃铛（未读数 + 下拉）→ 附属侧页面补齐 + SSE。
+- **当前**：**S5 收尾阶段**。S5.1 ✅ / S5.2 ✅ / S5.3 ✅；S5.4 进行中：B1（每人各自已读/发送批次/我发过的）✅、B2 星系视图 ✅、**B2 第 3 步通知中心页 ✅（21/0 + 8 截图）、第 5 步发布弹窗 ✅（6 截图 + Network）**。
+- **S5.4 剩余**：第 6 步 `NotificationBell` 铃铛（未读数 + 下拉，store 已就绪）→ 附属侧页面补齐 + SSE。
+- **S5.4-B2 第 5 步要点**：`NotificationSendDialog.vue` 四选一目标 + 联动多选（门店按商家分组）+ 每次打开重拉 targets；提交成功 → toast + 关窗 + 刷当前 Tab + 同步未读数；脏表单关闭需确认。**后端 `targetType` 是单数 `MERCHANT/STORE`**（不是 MERCHANTS/STORES）。
 - **回归入口**：`npm run regression`（seed 一次 → 顺序跑全部阶段脚本，失败即停；含 S5.1/S5.2/S5.3/S5.4-A/S5.4-B1/S5.4-B2，共 313 条）。
 - **下一步**：S5.4 第 5 步发布弹窗 → 第 6 步铃铛 → 附属侧 + SSE（每批停下验收）。
 

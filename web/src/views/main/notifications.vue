@@ -261,13 +261,8 @@
       </template>
     </el-dialog>
 
-    <!-- 发布通知：第 5 步做 NotificationSendDialog，此处先占位 -->
-    <el-dialog v-model="sendVisible" title="发布通知" width="480px" :close-on-click-modal="false">
-      <el-empty description="发布功能开发中（S5.4-B2 第 5 步 NotificationSendDialog）" />
-      <template #footer>
-        <el-button @click="sendVisible = false">知道了</el-button>
-      </template>
-    </el-dialog>
+    <!-- 发布通知：S5.4-B2 第 5 步 -->
+    <NotificationSendDialog v-model="sendVisible" @sent="onSent" />
   </div>
 </template>
 
@@ -288,6 +283,8 @@ import {
   type SentItem,
 } from '@/api/notification';
 import { useUserStore } from '@/stores/user';
+import { useNotificationStore } from '@/stores/notification';
+import NotificationSendDialog from '@/components/NotificationSendDialog.vue';
 import { formatDateTime } from '@/utils/dict';
 
 type TabKey = 'inbox' | 'sent';
@@ -323,7 +320,9 @@ const inboxLoading = ref(false);
 const markingAll = ref(false);
 const inboxList = ref<NotificationItem[]>([]);
 const inboxTotal = ref(0);
-const unreadCount = ref(0);
+/** 未读数改为 store 单一数据源（页面徽标与第 6 步铃铛共用，避免口径不一致） */
+const notificationStore = useNotificationStore();
+const unreadCount = computed(() => notificationStore.unreadCount);
 const inboxQuery = reactive({
   page: 1,
   pageSize: 10,
@@ -348,7 +347,7 @@ async function loadInbox() {
     });
     inboxList.value = res.list;
     inboxTotal.value = res.total;
-    unreadCount.value = res.unreadCount;
+    notificationStore.setCount(res.unreadCount);
   } finally {
     inboxLoading.value = false;
   }
@@ -365,7 +364,7 @@ async function onMarkRead(row: NotificationItem) {
   try {
     await notificationApi.markRead(row.id);
     row.alreadyRead = true;
-    unreadCount.value = Math.max(0, unreadCount.value - 1);
+    notificationStore.decrement();
     if (inboxQuery.readStatus === 'UNREAD') {
       // 未读视图下该行已不符合筛选，退回上一页边界后重拉
       if (inboxList.value.length === 1 && inboxQuery.page > 1) inboxQuery.page -= 1;
@@ -387,7 +386,7 @@ async function onMarkAllRead() {
   try {
     const res = await notificationApi.markAllRead();
     ElMessage.success(`已标记 ${res.updated} 条为已读`);
-    unreadCount.value = 0;
+    notificationStore.clear();
     if (inboxQuery.readStatus === 'READ' || inboxQuery.readStatus === '') {
       await loadInbox();
     } else {
@@ -474,8 +473,19 @@ function merchantName(merchantId: number | null) {
   return receivers.value.find((r) => r.receiverType === 'MERCHANT' && r.receiverId === merchantId)?.name ?? `商家 #${merchantId}`;
 }
 
-// ---------------------------------------------------- 发布占位
+// ---------------------------------------------------- 发布
 const sendVisible = ref(false);
+
+/** 发布成功：刷新当前 Tab 列表 + 同步未读数（铃铛第 6 步接同一 store） */
+async function onSent() {
+  if (activeTab.value === 'sent') {
+    sentQuery.page = 1;
+    await loadSent();
+  } else {
+    await loadInbox();
+  }
+  await notificationStore.refresh();
+}
 
 function levelTagType(level: string) {
   if (level === 'URGENT') return 'danger';

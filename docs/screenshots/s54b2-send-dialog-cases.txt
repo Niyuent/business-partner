@@ -1,0 +1,59 @@
+S5.4-B2 第 5 步验收：NotificationSendDialog.vue（发布通知弹窗）
+日期：2026-10-17   入口：http://localhost/main/notifications →「发布通知」按钮（platform 账号）
+抓取方式：agent-browser（真实 Chromium）
+
+================================================================================
+1) 四选一切换 + 联动下拉（截图）
+================================================================================
+s54b2-09-send-dialog-merchant.png        目标类型=指定商家 → 显示「选择目标」多选下拉
+                                        提示：共 2 个可选附属商家，已选 0 个（单次最多 200）
+s54b2-10-send-dialog-store.png           切到「指定门店」→ 提示联动为「共 3 个可选门店」
+s54b2-11-send-dialog-store-options.png   门店下拉**按商家分组**：城南旗舰店(S-101/S-102) + 城西社区店(S-201)
+s54b2-12-send-dialog-filled.png          选中 2 店 + 标题(18/50) + 内容(57/500) + 发送预告
+s54b2-15-send-dialog-all-merchants.png   「全部附属商家」→ **目标选择器隐藏**，发送预告变为
+                                        「将发送给『全部已审核附属商家』下的 2 个接收方」
+s54b2-16-discard-confirm.png             表单有内容时点「取消」→ 弹「确认放弃填写？」
+
+================================================================================
+2) 提交成功 toast + 联动刷新（截图 + Network）
+================================================================================
+s54b2-13-send-success-toast.png          toast「发布成功，已发送给 2 个接收方」；
+                                        发件箱自动刷新，新批次置顶（2 人 / 系统通知 / 普通）
+
+Network（发布瞬间，按顺序）：
+  [42888.41] POST http://localhost/api/v1/notifications                        (XHR) 201
+  [42888.42] GET  http://localhost/api/v1/notifications/sent?page=1&pageSize=10 (XHR) 200   <- 刷新发件箱
+  [42888.43] GET  http://localhost/api/v1/notifications/unread-count            (XHR) 200   <- 同步铃铛未读数
+
+================================================================================
+3) targets 每次打开都重新请求（不缓存）—— Network 证明
+================================================================================
+操作：清空请求日志 → 打开弹窗 → 取消 → 再打开弹窗
+
+  [42888.44] GET http://localhost/api/v1/notifications/targets (XHR) 200   <- 第 1 次打开
+  [42888.45] GET http://localhost/api/v1/notifications/targets (XHR) 200   <- 第 2 打开
+
+即「打开 N 次 = N 个 targets 请求」，无任何本地缓存 / memo。
+s54b2-14-reopen-dialog.png               第 2 次打开后的弹窗状态
+
+================================================================================
+4) 交互项核对
+================================================================================
+✅ 目标类型四选一（指定商家 / 指定门店 / 全部附属商家 / 全部门店）
+✅ 指定类显示多选下拉（门店按商家分组 + 编码后缀）；ALL_* 隐藏选择器
+✅ 切换目标类型自动清空已选（避免把门店 id 当商家 id 提交）
+✅ 标题必填 ≤50；内容必填 ≤500；类型/级别下拉（默认 系统通知/普通）
+✅ 发送预告实时显示接收方数量
+✅ 提交中按钮 loading 防重复点击（submitting 期间禁用表单与关闭）
+✅ 取消/关闭：空表单直接关；有内容弹「确认放弃填写？」；X/ESC 同样走 before-close
+✅ 提交成功：ElMessage + 关弹窗 + 刷新当前 Tab 列表 + 同步未读数 store
+✅ 后端契约：targetType 用后端枚举 MERCHANT/STORE/ALL_MERCHANTS/ALL_STORES（单数）；
+   ALL_* 时 targetIds 传空数组（后端对 ALL_* 且 targetIds 非空会 400 NOTIFICATION_TARGET_INVALID）
+✅ 无 mock：全部请求打到 /api/v1/*
+
+================================================================================
+5) 代码位置
+================================================================================
+web/src/components/NotificationSendDialog.vue   弹窗（表单 + 校验 + targets 拉取 + 提交）
+web/src/stores/notification.ts                  未读数 store（徽标 + 铃铛单一数据源，第 6 步复用）
+web/src/views/main/notifications.vue            「发布通知」按钮接 v-model + @sent 联动刷新
