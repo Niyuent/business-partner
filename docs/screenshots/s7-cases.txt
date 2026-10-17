@@ -1,0 +1,71 @@
+S7 验收：SSE 实时通知落地（替换铃铛 60s 轮询）
+日期：2026-10-17/18
+
+================================================================================
+后端：SSE 接入 Notification
+================================================================================
+触发点：NotificationService.send() —— 事务内 createMany 后按 sendBatchId 查回新建行，
+        **事务提交后**调用 SseService.broadcast（避免回滚后前端已收到）。
+推送数据：event=notification:new，data={ id, title, content, level, type, createdAt }
+鉴权与隔离：
+  · ticket 一次性（60s），`GET /sse/notifications?ticket=` 用 ticket 换 identity(userId/merchantId/storeId/userType)
+  · MERCHANT → target { merchantId } → 该商家管理员 + 其所有门店店员
+  · STORE    → target { merchantId(门店所属商家), storeId } → **仅该门店店员** + 该商家管理员
+  · SseTarget 新增 storeId 维度；match 用 `storeId == null` 兼容 JWT 未带该字段的管理员
+心跳：沿用 S1 的 30s `: ping`（SSE_HEARTBEAT_MS 可配），nginx 侧 proxy_buffering off + 3600s 超时已就绪。
+
+**修复的 S1 遗留缺陷**：`GET /sse/notifications` 未加 `@Public()`，被全局 JwtAuthGuard 拦成 **401**
+（EventSource 无法带 Authorization 头，鉴权本应由 ticket 承担）。加 `@Public()` 后恢复 200。
+
+后端用例 tmp-s7-cases.mjs（16/0）：
+  ✅ ticket 换流 200 + text/event-stream
+  ✅ connected 握手
+  ✅ MERCHANT 2 推送 → sub01 收到，**延迟 22ms**，payload 字段齐全
+  ✅ 同商家门店店员 clerk01 也收到（商家级）
+  ✅ STORE 101 推送 → clerk01 收到（**43ms**）、sub01（商家管理员）收到
+  ✅ 跨商家隔离：sub02（merchant 3）两条都收不到
+  ✅ 无效 ticket / 不带 ticket → 403
+  ✅ 在线连接数 ≥ 3
+
+================================================================================
+前端：铃铛接 SSE（移除轮询）
+================================================================================
+api/notification.ts 新增：
+  · SSE_NOTIFICATION_NEW='notification:new' / SSE_CONNECTED='connected'
+  · notificationSse.ticket() → POST /sse/ticket
+  · notificationSse.connect(ticket) → new EventSource(`${VITE_API_BASE}/sse/notifications?ticket=...`)
+stores/notification.ts 新增 increment(n)：收到推送直接 +1，不再回拉接口。
+
+NotificationBell.vue：
+  · **删除** 60s setInterval 轮询与 visibilitychange 补刷（连同 `// TODO(sse)` 注释）
+  · onMounted：store 未加载则 refresh 一次（首屏），然后 connectSse()
+  · 监听 notification:new → store.increment() + 铃铛抖动 600ms + 右下角 ElNotification（5s，可点击跳通知中心）
+  · onerror：**主动 close 再自建**（EventSource 自带重连会把已消费的一次性 ticket 重放 → 必然 403），
+    指数退避 3s→6s→12s→24s→48s→60s 封顶；connected 握手成功后重置为 3s
+  · onUnmounted：disposed 标记 + close + 清两个定时器（防卸载后仍排队重连）
+
+================================================================================
+双窗口实测（agent-browser 两个独立 session = 两个浏览器）
+================================================================================
+s7-01-before.png        窗口 A（sub01 附属）工作台：铃铛红点 **3**，「待办 4 / 未读 3」口径一致
+s7-02-publisher-dialog.png 窗口 B（admin 主体）通知中心 → 发布通知：目标=全部门店，
+                        标题/内容已填，发送预估「3 个接收方」
+s7-03-realtime-received.png 窗口 B 发布后**立刻**截 A：红点 **3 → 4**，工作台「未读 4」同步，
+                        右下角 toast 正在弹出（**页面全程未刷新**）
+s7-05-bell-panel.png    A 打开铃铛面板：列表出现「S7 实时推送 · 门店 101 紧急通知（红点=紧急）」
+                        与两条「S7 SSE 实时推送验证（全部门店）」
+s7-04-toast.png         再发一条商家级通知：红点 **5**、铃铛抖动（图标倾斜）、
+                        右下角完整 toast「S7 实时推送 · 商家级通知」
+
+Network 证据：
+  · 建连：POST /api/v1/sse/ticket 201 → GET /api/v1/sse/notifications?ticket=... (EventSource) 200
+  · 首屏仅 1 次 GET /api/v1/notifications/unread-count（之后靠推送增量）
+  · **清空日志后 70 秒：unread-count 请求数 = 0**（旧版 60s tick 必有 1 次）→ 轮询确认移除
+  · 70s 后 /sse/stats：connections=2（merchant 1 + merchant 2），长连接始终未断
+
+================================================================================
+全量回归
+================================================================================
+S1 23 / S2 12 / S3.1 32 / S3.2 39 / S3.3 15 / S3.4 20 / S4.1 16 / S4.2 18 /
+S4.3 26 / S5.1 14 / S5.2 15 / S5.3 22 / S5.4-A 32 / S5.4-B1 34 / S5.4-B2 21 /
+**S7 16（新增）** = **355 通过 / 0 失败**

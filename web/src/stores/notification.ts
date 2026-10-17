@@ -36,6 +36,17 @@ export const useNotificationStore = defineStore('notification', () => {
     unreadCount.value = Math.max(0, unreadCount.value - n);
   }
 
+  /**
+   * SSE 收到 `notification:new` 时 +1（S7）
+   *
+   * 刻意不再拉接口：推送本身已经证明「多了一条未读」，
+   * 这里只做乐观累加，下一次进通知中心列表时会自然校正。
+   */
+  function increment(n = 1) {
+    unreadCount.value = Math.max(0, unreadCount.value + n);
+    loaded.value = true;
+  }
+
   /** 全部已读 */
   function clear() {
     unreadCount.value = 0;
@@ -53,5 +64,5 @@ export const useNotificationStore = defineStore('notification', () => {
     readStateVersion.value += 1;
   }
 
-  return { unreadCount, loaded, readStateVersion, setCount, refresh, decrement, clear, bumpReadState };
+  return { unreadCount, loaded, readStateVersion, setCount, refresh, increment, decrement, clear, bumpReadState };
 });

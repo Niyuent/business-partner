@@ -40,6 +40,7 @@ const SCRIPTS = [
   ['tmp-s54a-cases', 'S5.4-A 站内信后端'],
   ['tmp-s54b1-cases', 'S5.4-B1 通知每人各自已读 + 我发过的 + 口径统一'],
   ['tmp-s54b2-cases', 'S5.4-B2 通知中心（收件箱/发件箱 + 某批收件人接口）'],
+  ['tmp-s7-cases', 'S7 SSE 实时通知（长连接 + 实时性 + 商家/门店维度隔离）'],
 ];
 
 const summaryOf = (out) =>

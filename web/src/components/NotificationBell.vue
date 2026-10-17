@@ -11,7 +11,7 @@
     <template #reference>
       <el-badge :value="badgeValue" :max="99" :hidden="badgeValue === 0" class="bell__badge">
         <el-button class="bell__trigger" text :aria-label="badgeValue > 0 ? `通知，${badgeValue} 条未读` : '通知'">
-          <el-icon :size="20"><Bell /></el-icon>
+          <el-icon :size="20" :class="{ 'bell__ring': ringing }"><Bell /></el-icon>
         </el-button>
       </el-badge>
     </template>
@@ -55,9 +55,15 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElNotification } from 'element-plus';
 import { Bell } from '@element-plus/icons-vue';
-import { notificationApi, type NotificationItem } from '@/api/notification';
+import {
+  SSE_CONNECTED,
+  SSE_NOTIFICATION_NEW,
+  notificationApi,
+  notificationSse,
+  type NotificationItem,
+} from '@/api/notification';
 import { useNotificationStore } from '@/stores/notification';
 import { useUserStore } from '@/stores/user';
 import { formatDateTime } from '@/utils/dict';
@@ -130,54 +136,122 @@ function onViewAll() {
   void router.push(inboxPath.value);
 }
 
-// ---------------------------------------------------------------- 未读数轮询
+// ---------------------------------------------------------------- SSE 实时推送（S7，替换 60s 轮询）
 
-const POLL_MS = 60 * 1000;
-let timer: ReturnType<typeof setInterval> | undefined;
-let lastFetchedAt = 0;
+/** 断线重连的指数退避：3s → 6s → 12s → 24s → 48s → 60s（封顶） */
+const RETRY_BASE_MS = 3000;
+const RETRY_MAX_MS = 60_000;
 
-async function pollUnread() {
-  // 页面不可见时不请求：既省流量，也避免后台标签页一直打接口
-  if (document.visibilityState !== 'visible') return;
-  lastFetchedAt = Date.now();
-  await store.refresh(); // store 内部已 catch，失败静默（红点保持原值）
+let es: EventSource | null = null;
+let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+let retryDelay = RETRY_BASE_MS;
+/** 组件已卸载：阻止卸载后仍排队重连 */
+let disposed = false;
+/** 铃铛抖动（收到新通知时给个视觉反馈） */
+const ringing = ref(false);
+let ringTimer: ReturnType<typeof setTimeout> | undefined;
+
+function ringBell() {
+  ringing.value = true;
+  if (ringTimer) clearTimeout(ringTimer);
+  ringTimer = setTimeout(() => {
+    ringing.value = false;
+    ringTimer = undefined;
+  }, 600);
 }
 
-function startPolling() {
-  stopPolling();
-  timer = setInterval(() => void pollUnread(), POLL_MS);
+/** 右下角轻提示：不打断当前操作，5s 自动消失，点击可跳通知中心 */
+function popNotice(data: { title?: string; content?: string }) {
+  const instance = ElNotification({
+    title: data.title || '新通知',
+    message: data.content || '',
+    type: 'info',
+    position: 'bottom-right',
+    duration: 5000,
+    onClick: () => {
+      instance.close();
+      void router.push(inboxPath.value);
+    },
+  });
 }
 
-function stopPolling() {
-  if (timer) {
-    clearInterval(timer);
-    timer = undefined;
+function closeSse() {
+  if (es) {
+    es.close();
+    es = null;
   }
 }
 
-/** 从后台切回前台：若距上次拉取已满一个周期，立即补一次（否则干等 60s） */
-function onVisibilityChange() {
-  if (document.visibilityState === 'visible' && Date.now() - lastFetchedAt >= POLL_MS) {
-    void pollUnread();
+function scheduleReconnect() {
+  if (disposed || reconnectTimer) return;
+  const delay = retryDelay;
+  // 先按当前退避值排一次，再把下一次的间隔翻倍（封顶 60s）
+  retryDelay = Math.min(retryDelay * 2, RETRY_MAX_MS);
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = undefined;
+    void connectSse();
+  }, delay);
+}
+
+async function connectSse() {
+  if (disposed) return;
+  closeSse();
+  try {
+    const t = await notificationSse.ticket();
+    const source = notificationSse.connect(t.ticket);
+    es = source;
+
+    // 握手成功：重置退避，下一次断线从 3s 重新开始
+    source.addEventListener(SSE_CONNECTED, () => {
+      retryDelay = RETRY_BASE_MS;
+    });
+
+    // 收到新站内信：未读数 +1 + 抖动 + 右下角提示（不再拉接口）
+    source.addEventListener(SSE_NOTIFICATION_NEW, (ev) => {
+      store.increment();
+      ringBell();
+      let payload: { title?: string; content?: string } = {};
+      try {
+        payload = JSON.parse((ev as MessageEvent<string>).data);
+      } catch {
+        /* 数据异常也不影响红点 */
+      }
+      popNotice(payload);
+    });
+
+    // EventSource 自带重连会把 URL（含已消费的一次性 ticket）再打一次 → 必然 403，
+    // 所以这里主动关掉再自己退避重连，用**新 ticket**。
+    source.onerror = () => {
+      if (disposed) return;
+      closeSse();
+      scheduleReconnect();
+    };
+  } catch {
+    // 换 ticket 失败（网络抖动 / 未登录）→ 静默退避重试，不弹 toast
+    scheduleReconnect();
   }
 }
 
 onMounted(async () => {
-  document.addEventListener('visibilitychange', onVisibilityChange);
-  // store 未加载过才请求：从通知中心页进来时 list 接口已顺带带回未读数，不重复打
-  if (!store.loaded) {
-    lastFetchedAt = Date.now();
-    await store.refresh();
-  }
-  startPolling();
+  // 首屏只拉一次未读数（store 未加载时）；之后全靠 SSE 增量更新
+  if (!store.loaded) await store.refresh();
+  void connectSse();
 });
 
 onUnmounted(() => {
-  stopPolling();
-  document.removeEventListener('visibilitychange', onVisibilityChange);
+  disposed = true;
+  closeSse();
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = undefined;
+  }
+  if (ringTimer) {
+    clearTimeout(ringTimer);
+    ringTimer = undefined;
+  }
 });
 
-// TODO(sse): 60s 轮询是临时方案，S7 SSE 落地后改为事件推送（notification:new → 直接更新红点）
+
 </script>
 
 <style scoped>
@@ -193,6 +267,31 @@ onUnmounted(() => {
 }
 .bell__trigger:hover {
   color: #1d2129;
+}
+/* 收到新通知时的抖动（600ms，与 ringBell 的定时器一致） */
+.bell__ring {
+  animation: bell-shake 0.6s ease-in-out;
+}
+@keyframes bell-shake {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  15% {
+    transform: rotate(18deg);
+  }
+  30% {
+    transform: rotate(-16deg);
+  }
+  45% {
+    transform: rotate(12deg);
+  }
+  60% {
+    transform: rotate(-10deg);
+  }
+  75% {
+    transform: rotate(6deg);
+  }
 }
 .bell__header {
   display: flex;

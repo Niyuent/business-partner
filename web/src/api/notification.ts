@@ -122,8 +122,39 @@ function normalize<T extends { alreadyRead?: unknown }>(item: T): T & { alreadyR
   return { ...item, alreadyRead: item.alreadyRead === true };
 }
 
+// ---------------------------------------------------------------- SSE（S7）
+/** 事件名：与后端 `NOTIFICATION_NEW_EVENT` 保持一致 */
+export const SSE_NOTIFICATION_NEW = 'notification:new';
+/** 连接建立后的握手事件（服务端在流开头下发，用于判断「真的连上了」） */
+export const SSE_CONNECTED = 'connected';
+
+export interface SseTicket {
+  ticket: string;
+  /** 有效期（秒），默认 60 */
+  expiresIn: number;
+  connectUrl: string;
+}
+
 /**
- * 站内信（S5.4-A 接收/发布 + S5.4-B1 每人各自已读 / 发送批次 / 我发过的）
+ * SSE 长连接（S7）
+ *
+ * 为什么走 ticket 而不是直接带 JWT：`EventSource` **不支持自定义请求头**，
+ * 无法携带 `Authorization`。所以先用 JWT 换一个 60 秒有效的一次性 ticket，
+ * 再用 `?ticket=` 建流（ticket 用后即焚，不会长期留在 URL / 日志里）。
+ */
+export const notificationSse = {
+  ticket() {
+    return http<SseTicket>({ url: '/sse/ticket', method: 'POST' });
+  },
+  /** 建立长连接（调用方负责 close / 重连） */
+  connect(ticket: string) {
+    const base = import.meta.env.VITE_API_BASE || '/api/v1';
+    return new EventSource(`${base}/sse/notifications?ticket=${encodeURIComponent(ticket)}`);
+  },
+};
+
+/**
+ * 站内信（S5.4-A 接收/发布 + S5.4-B1 每人各自已读 / 发送批次 / 我发过的 + S7 实时推送）
  *
  * 数据隔离一律由后端按 JWT 推导，本层**不接受任何 receiverId / merchantId 入参**。
  */

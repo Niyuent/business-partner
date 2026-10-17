@@ -65,7 +65,8 @@ docs/                 00-AI-Context(本文件) · 01~06 · archive/test-scripts/
 - **当前**：**S5 基本收官**。S5.1 ✅ / S5.2 ✅ / S5.3 ✅ / S5.4（通知三件套 + 铃铛 ✅，SSE 待 S7）/ **S5.5 附属侧页面补齐 ✅**（通知中心、本店订单、本店采购、本店对账）。
 - **S6-A 已完成（技术债 + 联调）**：① 测试脚本交叉脏数据三层治理（回归前置/收尾各 seed 一次 + tmp-s31 自清理 + `npm run db:reset`）；② 补 `tmp-s43-cases.mjs`（S4.3 报表 26/0，是最后一块空白）；③ E2E 主链路 12 张截图跑通（券码→用户→门店→抵扣→对账单金额全对得上）。全量回归 **339/0**。
 - **回归脚本总数**：15 个（S1/S2/S3.1–S3.4/S4.1/S4.2/S4.3/S5.1–S5.3/S5.4-A/B1/B2）。
-- **下一步**：S7（SSE 落地）或按排期。
+- **S7 SSE 已落地（2026-10-18）**：`notification:new` 实时推送，铃铛**移除 60s 轮询**改为长连接（指数退避重连）；`SseTarget` 新增 `storeId` 维度（门店级只推该店店员 + 商家管理员）；修了 S1 的 `GET /sse/notifications` 缺 `@Public()` 导致 401 的缺陷。回归 **355/0**（16 个脚本）。
+- **下一步**：按排期（S8 支付 / 其它）。
 - **S5.4-B2 前端已收官**（第 3 步通知中心页 ✅ / 第 5 步发布弹窗 ✅ / 第 6 步铃铛 ✅）；S5.4 剩余：SSE（S7）。
 - **S5.5 附属侧页面补齐** ✅ **收官**：S5.5-1（`/sub/notifications` 纯收件箱 + `/sub/orders` 本店订单）、S5.5-2（`/sub/purchases` 本店采购 + `/sub/settlements` 本店对账）。
 - **S5.5-2 要点**：采购只读（结算权归主体，路由权限码 `settlement:view`→`purchase:view`）；对对账 `GENERATED` 可确认/提异议（`v-permission="'settlement:confirm'"`），`CONFIRMED`/`DISPUTED` 只读；**详情抽屉操作条必须放 `el-drawer` 的 `#footer` 插槽**（放内容流末尾会被明细表格遮挡、按钮点不到）。

@@ -14,7 +14,11 @@ import { BizException, ReasonCode } from '../../common/exceptions/biz.exception'
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../audit-log/audit.service';
 import { JwtPayload } from '../auth/jwt-payload';
+import { SseService } from '../sse/sse.service';
 import { QueryNotificationDto, QuerySentNotificationDto, SendNotificationDto } from './dto/notification.dto';
+
+/** SSE 事件名（S7）：前端 EventSource 监听同名事件 */
+export const NOTIFICATION_NEW_EVENT = 'notification:new';
 
 /**
  * 站内信（S5.4-A 接收/发布 + S5.4-B1 每人各自已读、发送人、我发过的）
@@ -38,6 +42,8 @@ export class NotificationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    /** S7：发布后实时推送（事务提交后调用） */
+    private readonly sse: SseService,
   ) {}
 
   private async receiverWhere(user: JwtPayload): Promise<Prisma.NotificationWhereInput | null> {
@@ -281,7 +287,7 @@ export class NotificationService {
     // 一次发送 = 一个批次；「全部发送」展开的 N 行共享它，「我发过的通知」据此聚合
     const sendBatchId = randomUUID();
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const { count } = await tx.notification.createMany({
         data: receiverIds.map((receiverId) => ({
           receiverType,
@@ -293,6 +299,13 @@ export class NotificationService {
           senderId: user.sub,
           sendBatchId,
         })),
+      });
+
+      // S7：查回本批次新建的行（createMany 不返回 id），供事务提交后做 SSE 推送
+      const rows = await tx.notification.findMany({
+        where: { sendBatchId },
+        select: { id: true, receiverType: true, receiverId: true, title: true, content: true, type: true, level: true, createdAt: true },
+        orderBy: { id: 'asc' },
       });
 
       await this.audit.record(
@@ -319,8 +332,71 @@ export class NotificationService {
         tx,
       );
 
-      return { count, receiverType, receiverIds, type, level, title: dto.title, sendBatchId };
+      return { count, rows, receiverType, receiverIds, type, level, title: dto.title, sendBatchId };
     });
+
+    // 推送放在事务**提交之后**：避免事务回滚时前端已经收到「不存在的通知」
+    await this.pushNewNotifications(result.rows, result.receiverType);
+
+    const { rows: _rows, ...response } = result;
+    return response;
+  }
+
+  /**
+   * 实时推送新通知（S7）
+   *
+   * 按通知的接收维度选 target：
+   *  - MERCHANT：`{ merchantId }` → 该商家管理员 + 其所有门店店员（他们都能看到商家级通知）
+   *  - STORE：`{ merchantId(门店所属商家), storeId }` → **仅该门店店员** + 该商家管理员
+   *    （只用 merchantId 会误伤同商家其它门店的店员）
+   *
+   * 推送失败不影响发布结果：广播内部已逐个 try/catch，断开的连接会被清理。
+   */
+  private async pushNewNotifications(
+    rows: Array<{
+      id: number;
+      receiverType: ReceiverType;
+      receiverId: number;
+      title: string;
+      content: string;
+      type: NotificationType;
+      level: NotifyLevel;
+      createdAt: Date;
+    }>,
+    receiverType: ReceiverType,
+  ) {
+    if (!rows.length) return;
+
+    const payloadOf = (r: (typeof rows)[number]) => ({
+      id: r.id,
+      title: r.title,
+      content: r.content,
+      level: r.level,
+      type: r.type,
+      createdAt: r.createdAt.toISOString(),
+    });
+
+    if (receiverType === ReceiverType.MERCHANT) {
+      for (const row of rows) {
+        this.sse.broadcast(NOTIFICATION_NEW_EVENT, payloadOf(row), { merchantId: row.receiverId });
+      }
+      return;
+    }
+
+    // STORE：解析每个门店的所属商家，才能把「该商家管理员」也纳入推送范围
+    const stores = await this.prisma.store.findMany({
+      where: { id: { in: rows.map((r) => r.receiverId) } },
+      select: { id: true, merchantId: true },
+    });
+    const ownerOf = new Map(stores.map((s) => [s.id, s.merchantId]));
+    for (const row of rows) {
+      const merchantId = ownerOf.get(row.receiverId);
+      this.sse.broadcast(
+        NOTIFICATION_NEW_EVENT,
+        payloadOf(row),
+        merchantId === undefined ? { storeId: row.receiverId } : { merchantId, storeId: row.receiverId },
+      );
+    }
   }
 
   /**

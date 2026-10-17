@@ -37,6 +37,9 @@ export class SseController {
    * 服务端按 ticket 反查 userId / merchantId，只推送该维度通知
    */
   @Get('notifications')
+  // 必须 @Public：EventSource 不能自定义 Header，无法携带 Authorization；
+  // 本端点的鉴权由 **一次性 ticket**（consumeTicket）承担，全局 JwtAuthGuard 不能再拦。
+  @Public()
   @ApiOperation({ summary: 'SSE 事件流（?ticket=一次性票据）' })
   notifications(@Query('ticket') ticket: string, @Req() req: Request, @Res() res: Response) {
     const identity = this.sse.consumeTicket(ticket);

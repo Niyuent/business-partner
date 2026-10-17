@@ -11,10 +11,20 @@ export interface SseIdentity {
   username: string;
 }
 
-/** 推送目标：按用户或商家维度隔离，缺省则广播 */
+/**
+ * 推送目标：按用户 / 商家 / 门店维度隔离，缺省则广播
+ *
+ * - `{ userId }`        只推该后台账号
+ * - `{ merchantId }`    该商家下**所有**在线连接（商家管理员 + 其所有门店店员）
+ * - `{ merchantId, storeId }`  商家管理员（storeId=null）+ **该门店**店员（精确到店，同商家其它门店收不到）
+ *
+ * 最后一个组合是 S7 为「发给某个 STORE 的站内信」准备的：通知接收范围是
+ * 「该门店店员 ∪ 该门店所属商家的管理员」，用 merchantId 单独推会把同商家其它门店的店员误伤。
+ */
 export interface SseTarget {
   userId?: number;
   merchantId?: number;
+  storeId?: number;
 }
 
 interface Client {
@@ -123,6 +133,13 @@ export class SseService implements OnModuleDestroy {
     if (!target) return true;
     if (target.userId !== undefined && identity.userId !== target.userId) return false;
     if (target.merchantId !== undefined && identity.merchantId !== target.merchantId) return false;
+    if (target.storeId !== undefined) {
+      // 门店维度：命中「该门店的店员」或「该商家下未绑定门店的管理员」
+      // 注意用 `== null`：JWT 未带 storeId 字段时是 undefined，商家管理员也可能是 null
+      const isThatStoreClerk = identity.storeId === target.storeId;
+      const isMerchantAdmin = identity.storeId == null;
+      if (!isThatStoreClerk && !isMerchantAdmin) return false;
+    }
     return true;
   }
 
