@@ -1,18 +1,16 @@
 # =============================================================================
-# ⚠️ 本仓库已按所有者要求「上传全部文件」，原忽略规则**全部停用**。
+# 忽略规则（2026-10-17 恢复）
 #
-# 因此以下内容已进入 git 历史（公开仓库，且历史不可撤销）：
-#   1. .env / server/.env —— 含真实 MYSQL_ROOT_PASSWORD、JWT_SECRET、API_TOKEN、DATABASE_URL
-#   2. node_modules/     —— 约 452MB / 3.7 万文件（会显著拖慢 clone/CI）
-#   3. server/dist/ web/dist/ —— 构建产物
-#   4. uploads/          —— 运行时上传的图片（营业执照等）
-#   5. server-build.log  —— 构建日志
+# 背景：本仓库曾按所有者要求「上传全部文件」，以下规则一度全部停用，导致
+#       node_modules / 构建产物 / .env / uploads 进入了 git 历史。
 #
-# 安全提示：请尽快**轮换**上述口令与密钥（改完 GitHub 里的历史也删不掉），
-#          并考虑把仓库改为 Private。
+# ⚠️ 历史不可撤销：即使现在取消跟踪，**已进入历史的内容仍留在仓库里**
+#    （含 .env 中的 MYSQL_ROOT_PASSWORD / JWT_SECRET / API_TOKEN / DATABASE_URL）。
+#    因此：① 尽快轮换上述口令与密钥；② 若要彻底清除需改写历史
+#    （git filter-repo / BFG）并强推 —— 请与所有者确认后再做。
 #
-# 如需恢复忽略，取消下方对应行的注释即可：
-# -----------------------------------------------------------------------------
+# 本次恢复范围：依赖、构建产物、环境文件、备份、日志、运行时上传。
+# =============================================================================
 
 # 【仍然生效】测试脚本产物：临时 SQL，不入库（2026-10-15 起）
 tmp-*.sql
@@ -21,36 +19,41 @@ tmp-*.sql
 # 【仍然生效】HAR 抓包文件：浏览器验收的原始记录，体积大不入库（只保留同名 .txt 摘要）
 *.har
 
-# node_modules/
-# **/node_modules/
-# dist/
-# **/dist/
-# build/
-#
-# .env
-# **/.env
-# .env.local
-# .env.*.local
-# server/.env
-# web/.env
-#
-# .env.bak
-# *.bak
-# !.env.example
-# !**/.env.example
-#
-# *.log
-# npm-debug.log*
-# yarn-error.log*
-#
-# .DS_Store
-# .idea/
-# .vscode/
-#
-# coverage/
-# .temp/
-# .cache/
-# *.tsbuildinfo
-#
-# uploads/*
-# !uploads/.gitkeep
+# ---------------------------------------------------------------- 依赖与构建产物
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+build/
+
+# ---------------------------------------------------------------- 环境文件（含真实密钥，绝不出仓库）
+.env
+**/.env
+.env.local
+.env.*.local
+server/.env
+web/.env
+!.env.example
+!**/.env.example
+
+# ---------------------------------------------------------------- 备份 / 日志
+.env.bak
+*.bak
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# ---------------------------------------------------------------- 系统 / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# ---------------------------------------------------------------- 测试与缓存
+coverage/
+.temp/
+.cache/
+*.tsbuildinfo
+
+# ---------------------------------------------------------------- 运行时上传（保留 .gitkeep 占位）
+uploads/*
+!uploads/.gitkeep

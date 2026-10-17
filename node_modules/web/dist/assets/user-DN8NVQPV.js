@@ -1,1 +1,0 @@
-import{I as r}from"./index-CET_rpto.js";const s={list(t){return r({url:"/users",method:"GET",params:t})},detail(t){return r({url:`/users/${t}`,method:"GET"})},updateStatus(t,e){return r({url:`/users/${t}/status`,method:"PATCH",data:{status:e}})},bindPhone(t,e){return r({url:`/users/${t}/bind-phone`,method:"POST",data:{phone:e}})}};export{s as u};
