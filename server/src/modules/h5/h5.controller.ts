@@ -39,6 +39,30 @@ export class H5Controller {
     return this.h5.transactions(user, query);
   }
 
+  @Get('coupon-templates')
+  @ApiOperation({ summary: '可兑换券列表（分页）' })
+  couponTemplates(@Query('page') page?: string, @Query('pageSize') pageSize?: string) {
+    return this.h5.couponTemplates(Number(page) || 1, Number(pageSize) || 10);
+  }
+
+  @Get('my/coupons')
+  @ApiOperation({ summary: '我的卡包（未使用 / 已使用 / 已过期，分页）' })
+  myCoupons(
+    @CurrentUser() user: UserJwtPayload,
+    @Query('status') status?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    const tab = status === 'USED' || status === 'EXPIRED' ? status : 'UNUSED';
+    return this.h5.myCoupons(user, tab, Number(page) || 1, Number(pageSize) || 10);
+  }
+
+  @Post('points/exchange')
+  @ApiOperation({ summary: '积分兑换代金券（与 /h5/exchange 同一实现）' })
+  exchangePoints(@CurrentUser() user: UserJwtPayload, @Body() dto: ExchangePointsDto) {
+    return this.h5.exchange(user, dto);
+  }
+
   @Get('templates')
   @ApiOperation({ summary: '可兑换券列表（已上架 + 有库存 + 设了兑换积分）' })
   templates() {

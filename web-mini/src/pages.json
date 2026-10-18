@@ -1,0 +1,60 @@
+{
+  // 微信原生 tabBar 的 list 最多 5 项，会员 4 项与商家 4 项不能放进同一份配置。
+  // 两套底部菜单在 components/AppTabBar.vue 里按 bootstrap 返回的 role / tabs 切换。
+  "pages": [
+    {
+      "path": "pages/login/index",
+      "style": { "navigationBarTitleText": "登录" }
+    },
+    {
+      "path": "pages/member/home/index",
+      "style": { "navigationBarTitleText": "首页", "enableShareAppMessage": true, "enableShareTimeline": true }
+    },
+    {
+      "path": "pages/member/wallet/index",
+      "style": { "navigationBarTitleText": "卡包", "enableShareAppMessage": true, "enableShareTimeline": true }
+    },
+    {
+      "path": "pages/member/mall/index",
+      "style": { "navigationBarTitleText": "积分商城" }
+    },
+    {
+      "path": "pages/member/mine/index",
+      "style": { "navigationBarTitleText": "我的" }
+    },
+    {
+      "path": "pages/member/profile/index",
+      "style": { "navigationBarTitleText": "我的" }
+    },
+    {
+      "path": "pages/member/points/index",
+      "style": { "navigationBarTitleText": "积分明细" }
+    },
+    {
+      "path": "pages/apply/index",
+      "style": { "navigationBarTitleText": "入驻申请", "enableShareAppMessage": true }
+    }
+  ],
+  "subPackages": [
+    {
+      "root": "pages/merchant",
+      "pages": [
+        {
+          "path": "workbench/index",
+          "style": { "navigationBarTitleText": "工作台", "enableShareAppMessage": true }
+        },
+        { "path": "verify/index", "style": { "navigationBarTitleText": "核销" } },
+        { "path": "earn/index", "style": { "navigationBarTitleText": "录单发积分" } },
+        { "path": "redeem/index", "style": { "navigationBarTitleText": "核销" } },
+        { "path": "notice/index", "style": { "navigationBarTitleText": "通知" } },
+        { "path": "mine/index", "style": { "navigationBarTitleText": "我的" } }
+      ]
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "商盟",
+    "navigationBarBackgroundColor": "#ffffff",
+    "backgroundColor": "#f4f6f8"
+  }
+}

@@ -25,6 +25,7 @@ import { UserModule } from './modules/user/user.module';
 import { StoreModule } from './modules/store/store.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { AiModule } from './modules/ai/ai.module';
+import { MiniModule } from './modules/mini/mini.module';
 
 /**
  * 全站默认鉴权策略：**拒绝未声明的**。
@@ -74,6 +75,7 @@ import { AiModule } from './modules/ai/ai.module';
     NotificationModule,
     // AI：Laya 判断 + DeepSeek 文案 + 经营日报
     AiModule,
+    MiniModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

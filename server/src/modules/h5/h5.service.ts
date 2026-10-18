@@ -59,6 +59,56 @@ export class H5Service {
     return this.points.listExchangeRecords({ ...query, userId: p.userId }, this.scope(p));
   }
 
+  /** 可兑换券（已上架 + 设了兑换积分 + 有库存），分页给小程序列表用。 */
+  async couponTemplates(page = 1, pageSize = 10) {
+    const all = (await this.templates()).list;
+    const size = Math.min(Math.max(pageSize, 1), 20);
+    const current = Math.max(page, 1);
+    const start = (current - 1) * size;
+    return { list: all.slice(start, start + size), total: all.length, page: current, pageSize: size };
+  }
+
+  /** 我的卡包。未使用只含未过期；已过期含状态过期和未使用但已过有效期。 */
+  async myCoupons(p: UserJwtPayload, status: string, page = 1, pageSize = 10) {
+    const size = Math.min(Math.max(pageSize, 1), 20);
+    const current = Math.max(page, 1);
+    const now = new Date();
+    const where =
+      status === 'USED'
+        ? { userId: p.userId, status: 'USED' as const }
+        : status === 'EXPIRED'
+          ? {
+              userId: p.userId,
+              OR: [{ status: 'EXPIRED' as const }, { status: 'UNUSED' as const, expireAt: { lte: now } }],
+            }
+          : { userId: p.userId, status: 'UNUSED' as const, expireAt: { gt: now } };
+    const [rows, total] = await Promise.all([
+      this.prisma.couponInstance.findMany({
+        where,
+        include: { template: { select: { name: true, faceValue: true, subtitle: true } } },
+        orderBy: { id: 'desc' },
+        skip: (current - 1) * size,
+        take: size,
+      }),
+      this.prisma.couponInstance.count({ where }),
+    ]);
+    return {
+      list: rows.map((row) => ({
+        id: row.id,
+        code: row.code,
+        status: row.status,
+        name: row.template?.name ?? '代金券',
+        subtitle: row.template?.subtitle ?? '',
+        faceValue: Number(row.template?.faceValue ?? 0),
+        expireAt: row.expireAt,
+        usedAt: row.usedAt,
+      })),
+      total,
+      page: current,
+      pageSize: size,
+    };
+  }
+
   /** 可兑换券（已上架 + 设了兑换积分 + 有库存） */
   async templates() {
     const rows = await this.prisma.couponTemplate.findMany({

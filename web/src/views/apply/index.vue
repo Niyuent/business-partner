@@ -5,6 +5,7 @@
         <p class="apply__brand">商盟系统</p>
         <h1>附属商家入驻申请</h1>
         <p class="apply__sub">填写资料后提交，由主体商家审核。通过后会为您开通登录账号。</p>
+        <p v-if="inviteCode" class="apply__invite">专属邀请码 {{ inviteCode }}</p>
       </header>
 
       <div v-if="submitted" class="apply__done">
@@ -38,9 +39,13 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
+import { useRoute } from 'vue-router';
 import type { FormInstance, FormRules } from 'element-plus';
 import { http } from '@/utils/request';
+
+const route = useRoute();
+const inviteCode = computed(() => String(route.query.invite || ''));
 
 const formRef = ref<FormInstance>();
 const loading = ref(false);
@@ -136,6 +141,11 @@ async function onSubmit() {
   margin: 0;
   font-size: 26px;
   color: #0f172a;
+}
+.apply__invite {
+  margin: -8px 0 18px;
+  color: #0f766e;
+  font-weight: 700;
 }
 .apply__sub {
   margin: 10px 0 22px;
