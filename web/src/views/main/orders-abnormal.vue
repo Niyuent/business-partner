@@ -52,6 +52,18 @@
           <el-descriptions-item label="异常类型">{{ current ? abnormalTypeLabel(current.abnormalType) : '' }}</el-descriptions-item>
           <el-descriptions-item label="金额">{{ current?.totalAmount }}</el-descriptions-item>
         </el-descriptions>
+        <div class="page__ai">
+          <el-button :loading="analyzing" @click="onAnalyze">✨ AI 智能分析</el-button>
+          <p class="page__hint">仅供运营参考，不会自动处理这笔订单。</p>
+          <el-alert
+            v-if="analysis"
+            :title="`${analysis.suggestion} · 置信度 ${analysis.confidence.toFixed(2)}${analysis.fallbackUsed ? ' · 规则降级' : ''}`"
+            :description="analysis.reasons.length ? analysis.reasons.join('、') : '没有额外风险标签'"
+            type="info"
+            show-icon
+            :closable="false"
+          />
+        </div>
         <el-form label-width="90px" class="page__form">
           <el-form-item label="处理类型">
             <el-radio-group v-model="handleForm.handleType">
@@ -75,6 +87,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
+import { aiApi, type AbnormalAnalysis } from '@/api/ai';
 import { orderApi, type OrderListItem } from '@/api/order';
 import { formatDateTime } from '@/utils/dict';
 
@@ -106,12 +119,25 @@ const drawerVisible = ref(false);
 const submitting = ref(false);
 const current = ref<OrderListItem | null>(null);
 const handleForm = reactive({ handleType: 'CANCEL' as 'CANCEL' | 'AMOUNT_ERROR' | 'DISPUTE', result: '' });
+const analyzing = ref(false);
+const analysis = ref<AbnormalAnalysis | null>(null);
 
 function openHandle(row: OrderListItem) {
   current.value = row;
   handleForm.handleType = 'CANCEL';
   handleForm.result = '';
+  analysis.value = null;
   drawerVisible.value = true;
+}
+
+async function onAnalyze() {
+  if (!current.value) return;
+  analyzing.value = true;
+  try {
+    analysis.value = await aiApi.analyzeAbnormal(current.value.id);
+  } finally {
+    analyzing.value = false;
+  }
 }
 
 async function submitHandle() {
@@ -140,5 +166,13 @@ onMounted(load);
 }
 .page__form {
   margin-top: 16px;
+}
+.page__ai {
+  margin-top: 16px;
+}
+.page__hint {
+  margin: 8px 0;
+  color: #64748b;
+  font-size: 12px;
 }
 </style>

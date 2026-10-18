@@ -38,6 +38,14 @@ const ACTION = {
  */
 const REVERSE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+/** MySQL 1213：死锁。Prisma 原始查询失败时码是 P2010，信息里带 1213；交互式事务有时是 P2034。 */
+function isMysqlDeadlock(e: unknown): boolean {
+  if (!e || typeof e !== 'object') return false;
+  const err = e as { code?: string; message?: string; meta?: { code?: string } };
+  const blob = `${err.code ?? ''} ${err.message ?? ''} ${err.meta?.code ?? ''}`;
+  return blob.includes('1213') || err.code === 'P2034';
+}
+
 /**
  * 校验失败 → HTTP 状态映射
  *
@@ -177,8 +185,13 @@ export class RedemptionService {
     const totalAmount = dto.orderAmount ?? faceValue;
     const discountAmount = ctx.discountAmount;
 
+    // 同一模板的 usedCount 行会被多笔核销一起更新。InnoDB 在券实例行和模板行之间
+    // 可能报 1213 死锁。事务会整体回滚，重试不会留下半笔核销。
+    for (let attempt = 0; attempt < 3; attempt++) {
     try {
       return await this.prisma.$transaction(async (tx) => {
+        // 先锁模板行，让同一张券的并发核销排队，避免和券实例行互相等出 1213。
+        await tx.$queryRaw(Prisma.sql`SELECT id FROM coupon_templates WHERE id = ${instance.templateId} FOR UPDATE`);
         // ① 一单一券：订单存在则条件绑定（并发下不会绑重），不存在则建单
         let orderId: number | null = null;
         const existing = await tx.order.findUnique({
@@ -313,7 +326,9 @@ export class RedemptionService {
         return record;
       });
     } catch (e) {
+      if (attempt < 2 && isMysqlDeadlock(e)) continue;
       throw this.translatePrismaConflict(e, instance.code ?? dto.code);
+    }
     }
   }
 

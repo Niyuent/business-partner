@@ -40,7 +40,7 @@ export class OrderController {
   }
 
   @Post()
-  @Permissions('order:handle')
+  @Permissions('order:handle', 'point:earn')
   @ApiOperation({ summary: '后台补录订单（走 /points/earn 送积分，一单只送一次）' })
   create(@Body() dto: CreateOrderDto, @CurrentUser() user: JwtPayload, @Ip() ip: string, @Headers('user-agent') ua: string) {
     return this.orders.create(dto, user, ip, ua);

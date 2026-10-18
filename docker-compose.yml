@@ -69,6 +69,12 @@ services:
       WX_MODE: ${WX_MODE:-real}
       WX_APPID: ${WX_APPID:-}
       WX_SECRET: ${WX_SECRET:-}
+      # AI：Laya 在同一 compose 网络里，服务名 laya。DeepSeek 与小Z经营助手同一套变量，没配密钥则日报文案走模板。
+      LAYA_SERVICE_URL: ${LAYA_SERVICE_URL:-http://laya:8765}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://ark.cn-beijing.volces.com/api/v3}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
+      DEEPSEEK_FLASH_MODEL: ${DEEPSEEK_FLASH_MODEL:-}
       TZ: ${TZ:-Asia/Shanghai}
       # MVP 上传落本地磁盘；后续换 OSS 时改 UploadService 实现即可
       UPLOAD_DIR: ${UPLOAD_DIR:-/app/uploads}
@@ -89,6 +95,24 @@ services:
       timeout: 5s
       retries: 5
       start_period: 40s
+    networks: [shangmeng]
+
+  # ---------------------------------------------------------------- Laya 决策模型（经营日报的状态判断，不生成文字）
+  # 挂了不影响 server 启动：日报会降级成数字模板。首次拉镜像含权重，体积较大。
+  laya:
+    image: bmw8080/laya-decision-api:latest
+    container_name: shangmeng-laya
+    restart: unless-stopped
+    ports:
+      - '${LAYA_PORT:-8765}:8765'
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+    healthcheck:
+      test: ['CMD', 'python', '-c', 'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8765/readyz", timeout=5)']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
     networks: [shangmeng]
 
   # ---------------------------------------------------------------- 网关（Nginx + 前端静态资源）

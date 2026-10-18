@@ -60,13 +60,12 @@ docs/                 00-AI-Context(本文件) · 01~06 · archive/test-scripts/
 
 ## 6. 当前进度 & 下一步
 
-- **当前**：**S5 进行中**。S5.1 ✅ / S5.2 ✅ / S5.3 ✅；回归入口已含 S5.3（S1–S5.3；此前 204/0 + S5.3 22 条）。
-- **回归入口**：`npm run regression`（seed 一次 → 顺序跑全部阶段脚本，失败即停；含 S5.1/S5.2/S5.3 用例）。
-- **当前**：**S5 基本收官**。S5.1 ✅ / S5.2 ✅ / S5.3 ✅ / S5.4（通知三件套 + 铃铛 ✅，SSE 待 S7）/ **S5.5 附属侧页面补齐 ✅**（通知中心、本店订单、本店采购、本店对账）。
+- **当前**：**S0–S7 与 AI 辅助已完成**。S8 微信支付因商户资质审核暂缓。当前阶段是 S9 上线准备（Mock 标记、演示种子、秒杀压测、文档对齐）。
+- **回归入口**：`npm run regression`（seed 一次 → 顺序跑全部阶段脚本，失败即停）。
 - **S6-A 已完成（技术债 + 联调）**：① 测试脚本交叉脏数据三层治理（回归前置/收尾各 seed 一次 + tmp-s31 自清理 + `npm run db:reset`）；② 补 `tmp-s43-cases.mjs`（S4.3 报表 26/0，是最后一块空白）；③ E2E 主链路 12 张截图跑通（券码→用户→门店→抵扣→对账单金额全对得上）。全量回归 **339/0**。
 - **回归脚本总数**：15 个（S1/S2/S3.1–S3.4/S4.1/S4.2/S4.3/S5.1–S5.3/S5.4-A/B1/B2）。
 - **S7 SSE 已落地（2026-10-18）**：`notification:new` 实时推送，铃铛**移除 60s 轮询**改为长连接（指数退避重连）；`SseTarget` 新增 `storeId` 维度（门店级只推该店店员 + 商家管理员）；修了 S1 的 `GET /sse/notifications` 缺 `@Public()` 导致 401 的缺陷。回归 **355/0**（16 个脚本）。
-- **下一步**：按排期（S8 支付 / 其它）。
+- **下一步**：S8 微信支付（资质未齐前不启动）。材料清单见 `docs/09-S8支付资质材料清单.md`。S9 打磨见 `docs/08-快速启动指南.md`。
 - **S5.4-B2 前端已收官**（第 3 步通知中心页 ✅ / 第 5 步发布弹窗 ✅ / 第 6 步铃铛 ✅）；S5.4 剩余：SSE（S7）。
 - **S5.5 附属侧页面补齐** ✅ **收官**：S5.5-1（`/sub/notifications` 纯收件箱 + `/sub/orders` 本店订单）、S5.5-2（`/sub/purchases` 本店采购 + `/sub/settlements` 本店对账）。
 - **S5.5-2 要点**：采购只读（结算权归主体，路由权限码 `settlement:view`→`purchase:view`）；对对账 `GENERATED` 可确认/提异议（`v-permission="'settlement:confirm'"`），`CONFIRMED`/`DISPUTED` 只读；**详情抽屉操作条必须放 `el-drawer` 的 `#footer` 插槽**（放内容流末尾会被明细表格遮挡、按钮点不到）。
@@ -74,7 +73,7 @@ docs/                 00-AI-Context(本文件) · 01~06 · archive/test-scripts/
 - **S5.4-B2 第 6 步要点**：`NotificationBell.vue` 徽标（>99 显示 99+）+ Popover（最近 5 条未读 / 全部已读 / 查看全部 / 空态）；未读数只读 `stores/notification.ts`；60s 轮询 + visibility 守卫 + onUnmounted 清理 + 失败静默；`TODO(sse)` 已标注。跨组件同步用 store 的 `readStateVersion`（铃铛已读 → 通知中心页重拉）；`/dashboard` 待办未读数也改读 store。
 - **S5.4-B2 第 5 步要点**：`NotificationSendDialog.vue` 四选一目标 + 联动多选（门店按商家分组）+ 每次打开重拉 targets；提交成功 → toast + 关窗 + 刷当前 Tab + 同步未读数；脏表单关闭需确认。**后端 `targetType` 是单数 `MERCHANT/STORE`**（不是 MERCHANTS/STORES）。
 - **回归入口**：`npm run regression`（seed 一次 → 顺序跑全部阶段脚本，失败即停；含 S5.1/S5.2/S5.3/S5.4-A/S5.4-B1/S5.4-B2，共 313 条）。
-- **下一步**：S5.4 第 5 步发布弹窗 → 第 6 步铃铛 → 附属侧 + SSE（每批停下验收）。
+- **下一步**：S8 微信支付（资质未齐前不启动）。不在 S9 里实现支付。
 
 ## 7. 关键约定（必须遵守）
 

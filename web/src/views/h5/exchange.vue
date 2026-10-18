@@ -6,7 +6,7 @@
       left-icon="info-o"
       color="#166534"
       background="#f0fdf4"
-      text="S5.1：已用 C 端令牌登录（微信 code2session），userId 取自令牌，不再手工输入。"
+      text="测试环境专用：当前登录来自模拟 code，不是微信开放平台。userId 取自 C 端令牌。"
     />
 
     <div class="h5__user">

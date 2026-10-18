@@ -298,6 +298,20 @@ export const h5LoginRoute: RouteRecordRaw = {
   meta: { title: '登录', public: true },
 };
 
+/** 主体/平台只进 /main，附属/店员只进 /sub。未授权附属是 SUB_ADMIN_BASIC，也要能进本店页面。 */
+const MAIN_ROLES = ['MAIN_ADMIN', 'PLATFORM_ADMIN'];
+const SUB_ROLES = ['SUB_ADMIN', 'SUB_ADMIN_BASIC', 'STORE_CLERK'];
+
+function stampRoles(routes: RouteRecordRaw[], roles: string[]) {
+  for (const route of routes) {
+    route.meta = { ...(route.meta ?? {}), roles };
+    if (route.children?.length) stampRoles(route.children, roles);
+  }
+}
+
+stampRoles(mainRoutes, MAIN_ROLES);
+stampRoles(subRoutes, SUB_ROLES);
+
 export const profileRoute: RouteRecordRaw = {
   path: '/profile',
   name: 'Profile',

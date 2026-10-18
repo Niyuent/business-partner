@@ -1,6 +1,12 @@
 <template>
   <div class="page">
     <el-card shadow="never">
+      <div class="page__toolbar">
+        <el-button type="primary" @click="inviteOpen = true">
+          <el-icon class="el-icon--left"><UserPlusIcon /></el-icon>
+          + 邀请商家入驻
+        </el-button>
+      </div>
       <el-form :inline="true" class="page__filter">
         <el-form-item label="状态">
           <el-select v-model="query.status" clearable placeholder="全部" style="width: 130px" @change="onSearch">
@@ -95,7 +101,7 @@
     </el-card>
 
     <!-- 商家详情 -->
-    <el-drawer v-model="detailVisible" :title="`商家详情 · ${current?.name ?? ''}`" size="640px">
+    <el-drawer v-model="detailVisible" :title="`商家详情 · ${current?.name ?? ''}`" size="640px" @closed="onDrawerClosed">
       <el-descriptions :column="2" border size="small">
         <el-descriptions-item label="商家编码">{{ current?.code }}</el-descriptions-item>
         <el-descriptions-item label="类型">{{ current ? typeLabel(current.type) : '-' }}</el-descriptions-item>
@@ -134,21 +140,30 @@
         <el-table-column prop="status" label="状态" width="90" />
       </el-table>
     </el-drawer>
+    <InviteMerchantDialog v-model="inviteOpen" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue';
+import { onMounted, reactive, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { merchantApi } from '@/api/merchant';
+import InviteMerchantDialog from '@/components/InviteMerchantDialog.vue';
+import UserPlusIcon from '@/components/UserPlusIcon.vue';
 import type { Merchant, MerchantDetail, MerchantStatus, MerchantType } from '@/types/business';
 import { formatDateTime, statusLabel, statusTagType, typeLabel } from '@/utils/dict';
 
+const route = useRoute();
+const router = useRouter();
 const list = ref<Merchant[]>([]);
 const total = ref(0);
 const loading = ref(false);
 const detailVisible = ref(false);
+const inviteOpen = ref(false);
 const current = ref<MerchantDetail | null>(null);
+/** 避免 replace query 时和 watch 互相打架 */
+let syncingQuery = false;
 
 const query = reactive({
   page: 1,
@@ -180,14 +195,51 @@ function onSearch() {
   load();
 }
 
-async function openDetail(row: Merchant) {
+async function openDetailById(id: number, syncUrl: boolean) {
   try {
-    current.value = await merchantApi.detail(row.id);
+    current.value = await merchantApi.detail(id);
     detailVisible.value = true;
+    if (syncUrl && String(route.query.id ?? '') !== String(id)) {
+      syncingQuery = true;
+      await router.replace({ query: { ...route.query, id: String(id) } });
+      syncingQuery = false;
+    }
   } catch {
     current.value = null;
+    detailVisible.value = false;
   }
 }
+
+async function openDetail(row: Merchant) {
+  await openDetailById(row.id, true);
+}
+
+function clearQueryId() {
+  if (route.query.id == null) return;
+  const next = { ...route.query };
+  delete next.id;
+  syncingQuery = true;
+  void router.replace({ query: next }).finally(() => {
+    syncingQuery = false;
+  });
+}
+
+function onDrawerClosed() {
+  clearQueryId();
+}
+
+watch(
+  () => route.query.id,
+  (raw) => {
+    if (syncingQuery) return;
+    if (raw == null || raw === '') return;
+    const id = Number(Array.isArray(raw) ? raw[0] : raw);
+    if (!Number.isFinite(id) || id <= 0) return;
+    if (current.value?.id === id && detailVisible.value) return;
+    void openDetailById(id, false);
+  },
+  { immediate: true },
+);
 
 /** 启停：APPROVED ↔ SUSPENDED，暂停时建议填原因（写进 audit_logs） */
 async function onToggle(row: Merchant, target: 'APPROVED' | 'SUSPENDED') {
@@ -220,6 +272,11 @@ onMounted(load);
 </script>
 
 <style scoped>
+.page__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
 .page__filter {
   margin-bottom: 4px;
 }

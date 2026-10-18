@@ -822,6 +822,24 @@ model NotificationRead {
   @@map("notification_reads")
 }
 
+/// AI 调用记录（经营日报 / Laya / DeepSeek）。只记请求摘要与成败，不记密钥。
+model AiCallLog {
+  id           Int      @id @default(autoincrement()) @db.UnsignedInt
+  provider     String   @db.VarChar(20) // laya | deepseek
+  purpose      String   @db.VarChar(40) // daily-status | daily-copy
+  merchantId   Int?     @db.UnsignedInt
+  ok           Boolean
+  latencyMs    Int      @db.UnsignedInt
+  error        String?  @db.VarChar(255)
+  requestJson  Json?
+  responseJson Json?
+  createdAt    DateTime @default(now())
+
+  @@index([provider, createdAt])
+  @@index([merchantId, createdAt])
+  @@map("ai_call_logs")
+}
+
 model AuditLog {
   id           Int         @id @default(autoincrement()) @db.UnsignedInt
   operatorId   Int?        @db.UnsignedInt

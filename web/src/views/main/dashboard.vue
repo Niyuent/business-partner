@@ -2,6 +2,7 @@
   <div class="page">
     <!-- ==================== 星系视图（主体/平台；附属/店员自动降级） ==================== -->
     <div v-if="viewMode === 'galaxy'" v-loading="galaxyLoading" class="galaxy">
+      <div class="galaxy__stage">
       <div class="galaxy__canvas">
         <GalaxyChart :data="galaxy" />
       </div>
@@ -30,6 +31,10 @@
         <el-button size="small" type="primary" @click="viewMode = 'data'">查看详情</el-button>
       </div>
 
+      <div class="galaxy__hint">悬停查看商家指标 · 点击星球进入商家详情 · 星球大小 = 本月交易额</div>
+      </div>
+
+      <div class="galaxy__footer">
       <!-- 底部指标卡（可点击跳转） -->
       <div class="galaxy__cards">
         <div v-for="c in metricCards" :key="c.key" class="galaxy__card glass" @click="onCardClick(c.key)">
@@ -46,8 +51,7 @@
           <el-radio-button value="data">数据视图</el-radio-button>
         </el-radio-group>
       </div>
-
-      <div class="galaxy__hint">悬停查看商家指标 · 点击星球进入商家详情 · 星球大小 = 本月交易额</div>
+      </div>
     </div>
 
     <!-- ==================== 数据视图（原有内容 + 顶部切换） ==================== -->
@@ -412,13 +416,19 @@ onMounted(loadAll);
 
 /* ---------------- 星系视图 ---------------- */
 .galaxy {
-  position: relative;
+  display: flex;
+  flex-direction: column;
   height: calc(100vh - 118px);
   min-height: 520px;
   border-radius: 12px;
   overflow: hidden;
   background: radial-gradient(ellipse at 50% 45%, #1e293b 0%, #0f172a 55%, #0b1220 100%);
   color: #e2e8f0;
+}
+.galaxy__stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
 }
 .galaxy__canvas {
   position: absolute;
@@ -510,16 +520,24 @@ onMounted(loadAll);
   color: #fbbf24;
   font-size: 14px;
 }
+.galaxy__footer {
+  position: relative;
+  z-index: 3;
+  flex: none;
+  height: 108px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px 10px;
+}
 .galaxy__cards {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 18px;
+  flex: 1;
+  min-width: 0;
   display: flex;
   gap: 12px;
   justify-content: center;
-  padding: 0 20px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow: auto;
 }
 .galaxy__card {
   min-width: 120px;
@@ -548,9 +566,9 @@ onMounted(loadAll);
   color: #64748b;
 }
 .galaxy__switch {
-  position: absolute;
-  right: 16px;
-  bottom: 18px;
+  position: relative;
+  z-index: 4;
+  flex: none;
   padding: 6px;
   border-radius: 10px;
 }

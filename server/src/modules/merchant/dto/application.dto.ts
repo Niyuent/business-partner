@@ -19,10 +19,11 @@ export class CreateApplicationDto {
   @Matches(/^1[3-9]\d{9}$/, { message: '联系人手机号格式不正确' })
   contactPhone: string;
 
-  @ApiProperty({ example: '91310000MA1FL0009X' })
+  @ApiPropertyOptional({ example: '91310000MA1FL0009X', description: '营业执照号，选填' })
+  @IsOptional()
   @IsString()
   @Length(5, 64)
-  licenseNo: string;
+  licenseNo?: string;
 
   @ApiPropertyOptional({ example: '上海市' })
   @IsOptional()

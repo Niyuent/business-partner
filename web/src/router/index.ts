@@ -14,6 +14,12 @@ import { h5Auth } from '@/utils/h5Request';
 
 const routes: RouteRecordRaw[] = [
   {
+    path: '/apply',
+    name: 'MerchantApply',
+    component: () => import('@/views/apply/index.vue'),
+    meta: { title: '商家入驻申请', public: true },
+  },
+  {
     path: '/login',
     name: 'Login',
     component: () => import('@/views/login/index.vue'),
@@ -80,6 +86,11 @@ router.beforeEach(async (to) => {
   const permission = to.meta.permission as string | undefined;
   if (permission && !userStore.hasPermission(permission)) {
     return { name: 'Forbidden', query: { from: to.fullPath, need: permission } };
+  }
+
+  const roles = to.meta.roles as string[] | undefined;
+  if (roles?.length && !roles.some((role) => userStore.roles.includes(role))) {
+    return { name: 'Forbidden', query: { from: to.fullPath } };
   }
 
   return true;

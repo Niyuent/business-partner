@@ -16,7 +16,8 @@
     "prisma:seed": "npm run prisma:seed -w server",
     "prisma:studio": "npm run prisma:studio -w server",
     "db:reset": "docker compose exec -T server npm run prisma:seed",
-    "regression": "node scripts/regression.mjs"
+    "regression": "node scripts/regression.mjs",
+    "e2e:flash": "node scripts/e2e-flash-sale.mjs"
   },
   "engines": {
     "node": ">=18.18.0"

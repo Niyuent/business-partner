@@ -1,6 +1,12 @@
 <template>
   <div class="page">
     <el-card shadow="never">
+      <div class="page__toolbar">
+        <el-button type="primary" @click="inviteOpen = true">
+          <el-icon class="el-icon--left"><UserPlusIcon /></el-icon>
+          + 邀请商家入驻
+        </el-button>
+      </div>
       <el-form :inline="true" class="page__filter">
         <el-form-item label="状态">
           <el-select v-model="query.status" style="width: 140px" @change="onSearch">
@@ -92,7 +98,9 @@
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="提交时间">{{ formatDateTime(current?.createdAt) }}</el-descriptions-item>
-        <el-descriptions-item label="审核备注" :span="2">{{ current?.auditRemark || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="审核备注" :span="2">
+          <el-input v-model="remarkDraft" type="textarea" :rows="4" placeholder="可先识别执照，再把结果留在这里" />
+        </el-descriptions-item>
         <el-descriptions-item label="营业执照" :span="2">
           <div v-if="licenseImages.length" class="page__licenses">
             <el-image
@@ -107,22 +115,65 @@
           <span v-else>-</span>
         </el-descriptions-item>
       </el-descriptions>
+      <div class="page__ocr">
+        <el-button :loading="recognizing" @click="onRecognize">✨ 识别执照</el-button>
+        <el-tooltip v-if="showMockOcrHint" content="当前为模拟提取" placement="top">
+          <span class="page__mock-hint">当前为模拟提取</span>
+        </el-tooltip>
+        <p v-if="ocr" class="page__note">{{ ocr.note }}</p>
+        <el-table v-if="ocr" :data="ocrRows" size="small" border>
+          <el-table-column prop="label" label="字段" width="160" />
+          <el-table-column prop="extracted" label="识别结果" min-width="180" />
+          <el-table-column prop="filled" label="申请表" min-width="160" />
+          <el-table-column label="对比" width="90">
+            <template #default="{ row }">
+              <el-tag size="small" :type="row.same ? 'success' : 'danger'">{{ row.same ? '一致' : '不一致' }}</el-tag>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
     </el-dialog>
+    <InviteMerchantDialog v-model="inviteOpen" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { aiApi, type LicenseRecognition } from '@/api/ai';
 import { merchantApi } from '@/api/merchant';
+import InviteMerchantDialog from '@/components/InviteMerchantDialog.vue';
+import UserPlusIcon from '@/components/UserPlusIcon.vue';
 import type { MerchantApplication, MerchantStatus } from '@/types/business';
 import { formatDateTime, statusLabel, statusTagType } from '@/utils/dict';
 
+/** 未设置 VITE_OCR_SOURCE=cloud 时，识别结果来自 mock，而不是云 OCR。 */
+const showMockOcrHint = import.meta.env.DEV || import.meta.env.VITE_OCR_SOURCE !== 'cloud';
+
+const inviteOpen = ref(false);
 const list = ref<MerchantApplication[]>([]);
 const total = ref(0);
 const loading = ref(false);
 const detailVisible = ref(false);
 const current = ref<MerchantApplication | null>(null);
+const remarkDraft = ref('');
+const recognizing = ref(false);
+const ocr = ref<LicenseRecognition | null>(null);
+
+const ocrRows = computed(() => {
+  if (!ocr.value) return [];
+  const pairs = [
+    ['公司名称', ocr.value.companyName, ocr.value.form.companyName],
+    ['统一社会信用代码', ocr.value.creditCode, ocr.value.form.creditCode],
+    ['法人姓名', ocr.value.legalName, ocr.value.form.legalName],
+  ] as const;
+  return pairs.map(([label, extracted, filled]) => ({
+    label,
+    extracted: extracted || '（未识别）',
+    filled: filled || '（空）',
+    same: (extracted || '') === (filled || ''),
+  }));
+});
 
 const query = reactive({ page: 1, pageSize: 10, status: 'PENDING' as MerchantStatus });
 
@@ -146,7 +197,24 @@ function onSearch() {
 
 function openDetail(row: MerchantApplication) {
   current.value = row;
+  remarkDraft.value = row.auditRemark || '';
+  ocr.value = null;
   detailVisible.value = true;
+}
+
+async function onRecognize() {
+  if (!current.value) return;
+  recognizing.value = true;
+  try {
+    ocr.value = await aiApi.recognizeLicense(current.value.id);
+    remarkDraft.value = [
+      `公司名称：${ocr.value.companyName || '（未识别）'}`,
+      `统一社会信用代码：${ocr.value.creditCode || '（未识别）'}`,
+      `法人姓名：${ocr.value.legalName || '（未识别）'}`,
+    ].join('\n');
+  } finally {
+    recognizing.value = false;
+  }
 }
 
 /**
@@ -159,7 +227,7 @@ async function onApprove(row: MerchantApplication) {
     '审核通过',
     {
       inputPlaceholder: '审核备注（可选）',
-      inputValue: '',
+      inputValue: row.id === current.value?.id ? remarkDraft.value : '',
       confirmButtonText: '确认通过',
       cancelButtonText: '取消',
       type: 'warning',
@@ -176,9 +244,8 @@ async function onApprove(row: MerchantApplication) {
       // 初始口令只在本次响应里出现一次，必须让用户当场记下来
       await ElMessageBox.alert(
         `<div style="line-height:2">
-           账号：<b>${res.account.username}</b><br/>
-           初始口令：<b style="color:#e6a23c">${res.account.password}</b><br/>
-           <span style="color:#909399;font-size:12px">口令仅展示这一次，请立即保存并通知商家；该账号首次登录需修改密码。</span>
+           账号为 <b>${res.account.username}</b>，初始密码为 <b style="color:#e6a23c">${res.account.password}</b><br/>
+           <span style="color:#909399;font-size:12px">请把账号和初始密码发给商家（联系电话 ${row.contactPhone || '—'}）。密码只展示这一次，该账号首次登录需修改密码。</span>
          </div>`,
         '商家管理员账号已创建',
         { dangerouslyUseHTMLString: true, confirmButtonText: '我已保存' },
@@ -226,6 +293,11 @@ onMounted(load);
 </script>
 
 <style scoped>
+.page__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
 .page__filter {
   margin-bottom: 4px;
 }
@@ -242,5 +314,20 @@ onMounted(load);
   width: 90px;
   height: 90px;
   border-radius: 6px;
+}
+.page__mock-hint {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #b45309;
+  cursor: default;
+}
+.page__ocr {
+  margin-top: 16px;
+}
+.page__note {
+  margin: 8px 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
 }
 </style>

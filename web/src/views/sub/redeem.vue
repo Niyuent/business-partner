@@ -110,6 +110,48 @@
         </div>
       </template>
 
+      <el-divider content-position="left">智能录单</el-divider>
+      <el-form label-width="120px" class="page__form">
+        <el-form-item label="语音转写">
+          <el-input
+            v-model="voiceText"
+            placeholder="刚才客人消费 58"
+            style="width: 360px"
+            @keyup.enter="onIdentify"
+          />
+          <el-button type="primary" :loading="identifying" style="margin-left: 12px" @click="onIdentify">
+            识别客人
+          </el-button>
+        </el-form-item>
+        <el-form-item v-if="identifyNote" label="识别结果">
+          <el-alert :type="autoSelected ? 'success' : 'warning'" :closable="false" show-icon :title="identifyNote" />
+        </el-form-item>
+        <el-form-item v-if="candidates.length && !autoSelected" label="候选用户">
+          <el-table :data="sortedCandidates" size="small" border style="width: 520px">
+            <el-table-column prop="name" label="姓名" min-width="120" />
+            <el-table-column label="扫码" width="120">
+              <template #default="{ row }">{{ row.minutesAgo }} 分钟前</template>
+            </el-table-column>
+            <el-table-column label="操作" width="100">
+              <template #default="{ row }">
+                <el-button link type="primary" @click="pickCandidate(row)">选这位</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <div class="page__hint">置信度不够，不会自动入账，请店员点选。</div>
+        </el-form-item>
+        <el-form-item label="确认用户">
+          <span v-if="selectedUser">{{ selectedUser.name }}（#{{ selectedUser.id }}）</span>
+          <span v-else class="page__hint">尚未选定</span>
+        </el-form-item>
+        <el-form-item label="消费金额">
+          <el-input-number v-model="earnAmount" :min="0" :precision="2" :step="10" />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" :disabled="!selectedUser" :loading="earning" @click="onEarn">发放积分</el-button>
+        </el-form-item>
+      </el-form>
+
       <!-- 核销成功 -->
       <template v-if="done">
         <el-divider content-position="left">核销完成</el-divider>
@@ -126,7 +168,9 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { aiApi, type RecentScan } from '@/api/ai';
 import { authApi } from '@/api/auth';
+import { orderApi } from '@/api/order';
 import { redemptionApi, type VerifyOutcome } from '@/api/redemption';
 import request from '@/utils/request';
 import type { RedemptionRecord, StoreBrief, VerifyCouponResult } from '@/types/business';
@@ -157,6 +201,18 @@ const verifying = ref(false);
 const redeeming = ref(false);
 const outcome = ref<VerifyOutcome | null>(null);
 const done = ref<RedemptionRecord | null>(null);
+
+/** 低于此值只展示候选，不自动选中，更不会入账。 */
+const AUTO_CONFIDENCE = 0.5;
+const voiceText = ref('刚才客人消费 58');
+const identifying = ref(false);
+const earning = ref(false);
+const earnAmount = ref<number | undefined>(58);
+const candidates = ref<RecentScan[]>([]);
+const selectedUser = ref<RecentScan | null>(null);
+const autoSelected = ref(false);
+const identifyNote = ref('');
+const sortedCandidates = computed(() => [...candidates.value].sort((a, b) => a.minutesAgo - b.minutesAgo));
 
 // verify 无论成功失败都会带回券信息与逐项明细（失败时是 409/403/404 + detail）
 const verifyData = computed<Partial<VerifyCouponResult> | null>(() => outcome.value?.data ?? null);
@@ -233,6 +289,96 @@ async function onRedeem() {
     ElMessage.success('核销成功');
   } finally {
     redeeming.value = false;
+  }
+}
+
+async function loadRecentScans(): Promise<RecentScan[]> {
+  const page = await orderApi.list({ page: 1, pageSize: 20 });
+  const seen = new Set<number>();
+  const scans: RecentScan[] = [];
+  for (const order of page.list) {
+    if (seen.has(order.userId)) continue;
+    seen.add(order.userId);
+    const minutesAgo = Math.max(0, Math.round((Date.now() - new Date(order.createdAt).getTime()) / 60000));
+    scans.push({
+      id: order.userId,
+      name: order.userName || order.userPhone || `用户${order.userId}`,
+      minutesAgo,
+    });
+    if (scans.length >= 3) break;
+  }
+  return scans;
+}
+
+function pickCandidate(row: RecentScan) {
+  selectedUser.value = row;
+  autoSelected.value = false;
+  identifyNote.value = `已由店员选定 ${row.name}，确认金额后才会发放积分。`;
+}
+
+async function onIdentify() {
+  if (!voiceText.value.trim()) {
+    ElMessage.warning('请输入语音转写内容');
+    return;
+  }
+  identifying.value = true;
+  selectedUser.value = null;
+  autoSelected.value = false;
+  identifyNote.value = '';
+  try {
+    candidates.value = await loadRecentScans();
+    if (!candidates.value.length) {
+      identifyNote.value = '最近没有扫码客人，无法识别。';
+      return;
+    }
+    const result = await aiApi.identifyUser({
+      voiceText: voiceText.value.trim(),
+      recentScans: candidates.value,
+    });
+    const hit = candidates.value.find((item) => item.id === result.suggestedUserId) ?? null;
+    if (hit && result.confidence >= AUTO_CONFIDENCE && !result.fallbackUsed) {
+      selectedUser.value = hit;
+      autoSelected.value = true;
+      identifyNote.value = `已自动选中 ${hit.name}，置信度 ${result.confidence.toFixed(2)}。确认金额后再发放，不会自动入账。`;
+      return;
+    }
+    identifyNote.value = `置信度 ${result.confidence.toFixed(2)}，请从候选里点选。建议用户 #${result.suggestedUserId}。`;
+  } finally {
+    identifying.value = false;
+  }
+}
+
+async function onEarn() {
+  if (!selectedUser.value) {
+    ElMessage.warning('请先确认客人');
+    return;
+  }
+  if (earnAmount.value == null || earnAmount.value <= 0) {
+    ElMessage.warning('请输入消费金额');
+    return;
+  }
+  earning.value = true;
+  try {
+    const orderNo = `AI${Date.now()}`.slice(0, 32);
+    const res = await orderApi.create({
+      orderNo,
+      userId: selectedUser.value.id,
+      storeId: form.storeId,
+      orderType: 'CONSUME',
+      totalAmount: earnAmount.value,
+      payAmount: earnAmount.value,
+      amount: earnAmount.value,
+      source: 'WEB',
+      remark: voiceText.value.trim() || '智能录单',
+    });
+    const points = res.points as { earned?: boolean; points?: number; message?: string } | null;
+    if (points && points.earned === false) {
+      ElMessage.warning(points.message || '本次未发放积分');
+    } else {
+      ElMessage.success(`已为 ${selectedUser.value.name} 记下一笔消费，订单 ${res.order.orderNo}`);
+    }
+  } finally {
+    earning.value = false;
   }
 }
 

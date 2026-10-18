@@ -24,6 +24,7 @@ import { H5Module } from './modules/h5/h5.module';
 import { UserModule } from './modules/user/user.module';
 import { StoreModule } from './modules/store/store.module';
 import { NotificationModule } from './modules/notification/notification.module';
+import { AiModule } from './modules/ai/ai.module';
 
 /**
  * 全站默认鉴权策略：**拒绝未声明的**。
@@ -71,6 +72,8 @@ import { NotificationModule } from './modules/notification/notification.module';
     StoreModule,
     // S5.4-A：站内信（列表 / 未读数 / 已读 / 主体发布）
     NotificationModule,
+    // AI：Laya 判断 + DeepSeek 文案 + 经营日报
+    AiModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

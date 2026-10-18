@@ -342,6 +342,8 @@ async function main() {
     ['store:change:review', '审核门店变更申请', 'store'],
     // S5.4-A 站内信发布（仅主体/平台；追加在末尾，已有权限的固定主键不变）
     ['notification:send', '发布站内信', 'notification'],
+    // AI 经营日报手动补跑（追加在末尾，已有权限的固定主键不变；只随全量权限给主体/平台）
+    ['ai:report:run', '生成经营日报', 'ai'],
   ];
 
   const permissionSeeds: Array<{ id: number; code: string; name: string; group: string }> = [];
@@ -472,6 +474,8 @@ async function main() {
       phone: '13900000003',
       merchantId: sub2.id,
       userType: AdminUserType.MERCHANT,
+      // 城西已有发券授权。角色仍用「未授权」模板：不带 coupon:issue-main。
+      // S2 用例 A1 在刚 seed 的基线上就要 403，不能等 S1 先把授权关掉。
       roles: { create: [{ roleId: roles['SUB_ADMIN_BASIC'] }] },
     },
   });
@@ -656,7 +660,22 @@ async function main() {
       },
     },
   });
-  // SUB-02 不创建授权记录（未授权）
+  // 城西社区店：已授权发放 T1 / T2。账号角色不含 coupon:issue-main，
+  // 所以 sub02 直接发券仍是 403（S2 A1）。授权关系本身在主体「授权管理」里可见。
+  await prisma.merchantAuthorization.create({
+    data: {
+      mainMerchantId: main.id,
+      subMerchantId: sub2.id,
+      authType: AuthType.ISSUE_MAIN_COUPON,
+      status: AuthStatus.ENABLED,
+      templateScope: TemplateScope.SPECIFIED,
+      grantedBy: admin.id,
+      grantedAt: now,
+      templates: {
+        create: [{ templateId: t1.id }, { templateId: t2.id }],
+      },
+    },
+  });
 
   // ---------------------------------------------------------------- 预生成券码
   console.log('→ 预生成券码 ...');
@@ -1043,6 +1062,27 @@ async function main() {
       },
       {
         receiverType: ReceiverType.MERCHANT,
+        receiverId: main.id,
+        type: NotificationType.SETTLEMENT,
+        title: '城南旗舰店对账单待确认',
+        content: '对账单 SET-DEMO-SUB01 已生成，金额为近 30 天核销面额合计，请核对后确认。',
+        level: NotifyLevel.IMPORTANT,
+        bizType: 'SETTLEMENT',
+        readStatus: ReadStatus.UNREAD,
+      },
+      {
+        receiverType: ReceiverType.MERCHANT,
+        receiverId: main.id,
+        type: NotificationType.AUDIT_RESULT,
+        title: '城北便利店等待入驻审核',
+        content: '城北便利店仍是待审核申请。通过前不会出现在已入驻商家里。',
+        level: NotifyLevel.NORMAL,
+        bizType: 'MERCHANT',
+        bizId: ID.MERCHANT_SUB3_PENDING,
+        readStatus: ReadStatus.UNREAD,
+      },
+      {
+        receiverType: ReceiverType.MERCHANT,
         receiverId: sub1.id,
         type: NotificationType.AUTH_CHANGE,
         title: '已开通「发放主体商家代金券」权限',
@@ -1080,6 +1120,285 @@ async function main() {
     },
   });
 
+  // ---------------------------------------------------------------- 演示丰度
+  // 稳定主键和张三/李四的积分批次保持原样（回归硬编码）。
+  // 这里只追加：5 个用户里的后 3 位、近 30 天消费、兑换、第 2 笔核销、待确认对账单。
+  // 城北便利店保持 PENDING：S1 用例 B1 断言商家 #4 在待审列表里。
+  console.log('→ 补充演示用户、消费、兑换与对账单 ...');
+  const daysAgo = (days: number, hour = 11) => {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    d.setHours(hour, (days * 7) % 60, 0, 0);
+    return d;
+  };
+  const demoUsers = [
+    { id: 1101, phone: '13800001011', nickname: '王五', orders: [86, 42, 120, 35] },
+    { id: 1102, phone: '13800001012', nickname: '赵六', orders: [64, 28, 90] },
+    { id: 1103, phone: '13800001013', nickname: '孙七', orders: [50, 48, 33, 70, 22] },
+  ] as const;
+  for (const demo of demoUsers) {
+    const earned = demo.orders.reduce((sum, n) => sum + n, 0);
+    await prisma.user.create({
+      data: {
+        id: demo.id,
+        phone: demo.phone,
+        nickname: demo.nickname,
+        status: 'ACTIVE',
+        registeredAt: daysAgo(20, 9),
+      },
+    });
+    const account = await prisma.pointAccount.create({
+      data: {
+        userId: demo.id,
+        balance: earned - 5,
+        totalEarned: earned,
+        totalSpent: 5,
+        totalExpired: 0,
+      },
+    });
+    await prisma.pointTransaction.create({
+      data: {
+        userId: demo.id,
+        accountId: account.id,
+        type: PointTxnType.EARN,
+        amount: earned,
+        remainingAmount: earned - 5,
+        balanceAfter: earned,
+        expireAt: addMonths(now, 12),
+        merchantId: sub1.id,
+        storeId: store101.id,
+        remark: '近 30 天消费送积分',
+      },
+    });
+    await prisma.pointTransaction.create({
+      data: {
+        userId: demo.id,
+        accountId: account.id,
+        type: PointTxnType.SPEND,
+        amount: -5,
+        remainingAmount: 0,
+        balanceAfter: earned - 5,
+        merchantId: main.id,
+        remark: '积分兑换 T2 无门槛5元',
+      },
+    });
+    for (let i = 0; i < demo.orders.length; i++) {
+      const pay = demo.orders[i];
+      const atSouth = i % 2 === 0;
+      const when = daysAgo(i + 1, 10 + i);
+      await prisma.order.create({
+        data: {
+          orderNo: `ORD-DEMO-${demo.id}-${i + 1}`,
+          userId: demo.id,
+          merchantId: atSouth ? sub1.id : sub2.id,
+          storeId: atSouth ? store101.id : store201.id,
+          orderType: OrderType.CONSUME,
+          totalAmount: pay,
+          payAmount: pay,
+          pointsEarned: pay,
+          status: OrderStatus.NORMAL,
+          source: OrderSource.APPLET,
+          consumeTime: when,
+          createdAt: when,
+        },
+      });
+    }
+  }
+
+  const extraOrders: Array<[string, number, number, number, number, number]> = [
+    ['ORD-DEMO-1001-3', zhangsan.id, sub1.id, store101.id, 76, 3],
+    ['ORD-DEMO-1001-4', zhangsan.id, sub2.id, store201.id, 54, 6],
+    ['ORD-DEMO-1002-2', lisi.id, sub2.id, store201.id, 42, 1],
+    ['ORD-DEMO-1002-3', lisi.id, sub1.id, store101.id, 55, 4],
+    ['ORD-DEMO-1002-4', lisi.id, sub1.id, store102.id, 70, 6],
+  ];
+  for (const [orderNo, userId, merchantId, storeId, pay, days] of extraOrders) {
+    const when = daysAgo(days, 14);
+    await prisma.order.create({
+      data: {
+        orderNo,
+        userId,
+        merchantId,
+        storeId,
+        orderType: OrderType.CONSUME,
+        totalAmount: pay,
+        payAmount: pay,
+        pointsEarned: 0,
+        status: OrderStatus.NORMAL,
+        source: OrderSource.APPLET,
+        consumeTime: when,
+        createdAt: when,
+      },
+    });
+  }
+
+  const pool = await prisma.couponCode.findMany({
+    where: { templateId: t2.id, status: CouponCodeStatus.UNISSUED },
+    take: 4,
+    orderBy: { id: 'asc' },
+  });
+  if (pool.length < 4) throw new Error('T2 预生成券码不足，无法写入演示兑换/核销');
+  const exchangeOwners = [zhangsan.id, 1101, 1102, 1103];
+  for (let i = 0; i < 3; i++) {
+    const userId = exchangeOwners[i + 1];
+    const row = pool[i];
+    const instance = await prisma.couponInstance.create({
+      data: {
+        userId,
+        templateId: t2.id,
+        code: row.code,
+        issuerMerchantId: main.id,
+        source: CouponSource.EXCHANGE,
+        pointsCost: 5,
+        status: CouponInstanceStatus.UNUSED,
+        obtainedAt: daysAgo(i + 1, 16),
+        expireAt: addMonths(now, 1),
+      },
+    });
+    await prisma.couponCode.update({
+      where: { id: row.id },
+      data: { instanceId: instance.id, status: CouponCodeStatus.ISSUED },
+    });
+    await prisma.exchangeRecord.create({
+      data: {
+        userId,
+        templateId: t2.id,
+        couponInstanceId: instance.id,
+        pointsCost: 5,
+        requestId: `seed-exchange-${userId}`,
+        channel: 'H5',
+        merchantId: main.id,
+        createdAt: daysAgo(i + 1, 16),
+      },
+    });
+  }
+  await prisma.exchangeRecord.create({
+    data: {
+      userId: zhangsan.id,
+      templateId: t2.id,
+      couponInstanceId: unusedInstance.id,
+      pointsCost: 5,
+      requestId: 'seed-exchange-1001',
+      channel: 'H5',
+      merchantId: main.id,
+      createdAt: daysAgo(1, 11),
+    },
+  });
+
+  const redeemCode = pool[3];
+  const redeemed = await prisma.couponInstance.create({
+    data: {
+      userId: 1101,
+      templateId: t2.id,
+      code: redeemCode.code,
+      issuerMerchantId: main.id,
+      source: CouponSource.EXCHANGE,
+      pointsCost: 5,
+      status: CouponInstanceStatus.USED,
+      obtainedAt: daysAgo(2, 15),
+      expireAt: addMonths(now, 1),
+      usedAt: daysAgo(1, 18),
+    },
+  });
+  await prisma.couponCode.update({
+    where: { id: redeemCode.id },
+    data: { instanceId: redeemed.id, status: CouponCodeStatus.REDEEMED },
+  });
+  const redeemOrder = await prisma.order.create({
+    data: {
+      orderNo: 'ORD-DEMO-REDEEM-2',
+      userId: 1101,
+      merchantId: sub1.id,
+      storeId: store101.id,
+      orderType: OrderType.CONSUME,
+      totalAmount: 40,
+      discountAmount: 5,
+      payAmount: 35,
+      couponInstanceId: redeemed.id,
+      pointsEarned: 35,
+      status: OrderStatus.NORMAL,
+      source: OrderSource.WEB,
+      consumeTime: daysAgo(1, 18),
+      createdAt: daysAgo(1, 18),
+    },
+  });
+  const redeem2 = await prisma.redemptionRecord.create({
+    data: {
+      couponInstanceId: redeemed.id,
+      code: redeemCode.code,
+      userId: 1101,
+      storeId: store101.id,
+      merchantId: sub1.id,
+      templateId: t2.id,
+      faceValue: 5,
+      discountAmount: 5,
+      orderId: redeemOrder.id,
+      channel: RedemptionChannel.MANUAL,
+      status: RedemptionStatus.SUCCESS,
+      redeemedAt: daysAgo(1, 18),
+    },
+  });
+  const redeem1 = await prisma.redemptionRecord.findFirstOrThrow({
+    where: { code: 'T1-USED-CODE', status: RedemptionStatus.SUCCESS },
+    include: { store: { select: { name: true } } },
+  });
+  const purchase = await prisma.purchaseRecord.findFirstOrThrow({
+    where: { purchaseNo: 'PU20260101001' },
+    include: { template: { select: { name: true } } },
+  });
+  await prisma.couponTemplate.update({
+    where: { id: t2.id },
+    data: { issuedCount: { increment: 4 }, usedCount: { increment: 1 } },
+  });
+  await prisma.settlementReport.create({
+    data: {
+      reportNo: 'SET-DEMO-SUB01',
+      periodStart: daysAgo(30, 0),
+      periodEnd: now,
+      merchantId: sub1.id,
+      reportType: 'SUMMARY',
+      totalCount: 2,
+      totalAmount: 25,
+      status: 'GENERATED',
+      generatedBy: admin.id,
+      detail: {
+        redemptions: [
+          {
+            id: redeem1.id,
+            code: redeem1.code,
+            userId: redeem1.userId,
+            storeId: redeem1.storeId,
+            storeName: redeem1.store?.name ?? null,
+            faceValue: 20,
+            discountAmount: 20,
+            redeemedAt: redeem1.redeemedAt.toISOString(),
+          },
+          {
+            id: redeem2.id,
+            code: redeem2.code,
+            userId: redeem2.userId,
+            storeId: redeem2.storeId,
+            storeName: 'S-101 中心店',
+            faceValue: 5,
+            discountAmount: 5,
+            redeemedAt: redeem2.redeemedAt.toISOString(),
+          },
+        ],
+        purchases: [
+          {
+            id: purchase.id,
+            purchaseNo: purchase.purchaseNo,
+            templateName: purchase.template?.name ?? null,
+            quantity: purchase.quantity,
+            totalAmount: Number(purchase.totalAmount),
+            settleStatus: purchase.settleStatus,
+            purchasedAt: purchase.purchasedAt.toISOString(),
+          },
+        ],
+      },
+    },
+  });
+
   await prisma.storeChangeRequest.create({
     data: {
       storeId: store101.id,
@@ -1098,7 +1417,7 @@ async function main() {
   console.log(`演示账号（密码均为 ${PASSWORD}）：`);
   console.log(`  admin   / ${PASSWORD}   主体商家管理员（全平台）  id=${ID.ADMIN} merchantId=${ID.MERCHANT_MAIN}`);
   console.log(`  sub01   / ${PASSWORD}   附属商家 · 城南旗舰店（已授权发主体券）  id=${ID.ADMIN_SUB01} merchantId=${ID.MERCHANT_SUB1}`);
-  console.log(`  sub02   / ${PASSWORD}   附属商家 · 城西社区店（未授权）  id=${ID.ADMIN_SUB02} merchantId=${ID.MERCHANT_SUB2}`);
+  console.log(`  sub02   / ${PASSWORD}   附属商家 · 城西社区店（授权记录已开，角色仍不能发券）  id=${ID.ADMIN_SUB02} merchantId=${ID.MERCHANT_SUB2}`);
   console.log(`  clerk01 / ${PASSWORD}   店员 · S-101 中心店  id=${ID.ADMIN_CLERK01} merchantId=${ID.MERCHANT_SUB1} storeId=${ID.STORE_101}`);
   console.log('\n主键固定，重跑 seed 不会变化（详见 docs/06-验收清单.md 的「稳定 ID 对照表」）');
   console.log('\n可用于验收的数据：');

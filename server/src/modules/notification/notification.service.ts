@@ -343,6 +343,68 @@ export class NotificationService {
   }
 
   /**
+   * 系统通知（经营日报等没有登录用户的场景）。
+   *
+   * 不走 `send()`：那条路径的发布范围只有「主体的直属附属」，主体商家自己会被 403。
+   * 写入、审计、事务提交后再 SSE，与 `send()` 相同。
+   */
+  async deliverSystem(input: {
+    receiverType: ReceiverType;
+    receiverId: number;
+    title: string;
+    content: string;
+    level?: NotifyLevel;
+    bizType?: string;
+    bizId?: number;
+  }) {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.notification.create({
+        data: {
+          receiverType: input.receiverType,
+          receiverId: input.receiverId,
+          type: NotificationType.SYSTEM,
+          level: input.level ?? NotifyLevel.NORMAL,
+          title: input.title,
+          content: input.content,
+          bizType: input.bizType ?? null,
+          bizId: input.bizId ?? null,
+          senderId: null,
+          sendBatchId: randomUUID(),
+        },
+        select: {
+          id: true,
+          receiverType: true,
+          receiverId: true,
+          title: true,
+          content: true,
+          type: true,
+          level: true,
+          createdAt: true,
+        },
+      });
+      await this.audit.record(
+        {
+          operatorId: null,
+          operatorType: 'SYSTEM',
+          operatorName: 'system',
+          module: 'notification',
+          action: 'notification:send',
+          targetType: 'notification',
+          targetId: row.id,
+          after: { bizType: input.bizType ?? null, receiverType: input.receiverType, receiverId: input.receiverId, title: input.title },
+          ip: null,
+          userAgent: 'ai-daily-report',
+        },
+        tx,
+      );
+      return row;
+    });
+
+    await this.pushNewNotifications([result], result.receiverType);
+    return { id: result.id };
+  }
+
+  /**
    * 实时推送新通知（S7）
    *
    * 按通知的接收维度选 target：

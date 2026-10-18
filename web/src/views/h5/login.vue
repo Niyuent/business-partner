@@ -6,13 +6,13 @@
       left-icon="info-o"
       color="#92400e"
       background="#fffbeb"
-      text="S5.1：C 端走微信登录（wx.login → code → openid）。本机无微信凭据时用「模拟 code」走通同一链路。"
+      text="测试环境专用：此处填写 code 模拟微信 wx.login。生产环境由微信静默登录，不出现这个输入框。"
     />
 
     <div class="h5-login__form">
-      <van-field v-model="code" label="模拟 code" placeholder="dev-code-1001" clearable />
+      <van-field v-model="code" label="测试 code" placeholder="dev-code-1001" clearable />
       <div class="h5-login__hint">
-        未配置 WX_APPID/WX_SECRET 时，后端把 code 确定性地映射为 openid（dev_openid_&lt;code&gt;）。
+        测试环境专用。未配置 WX_APPID/WX_SECRET 时，后端把 code 确定性地映射为 openid（dev_openid_&lt;code&gt;）。
         同一个 code 每次都登录同一个用户。
       </div>
       <van-button block type="primary" :loading="loading" @click="onLogin">微信登录</van-button>
